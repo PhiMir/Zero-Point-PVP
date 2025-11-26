@@ -5,13 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Zero Point: PVP</title>
   
-  <!-- React / Babel / Tailwind -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -39,7 +37,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useCallback, useRef } = React;
 
     // Firebase 설정
     const firebaseConfig = {
@@ -55,15 +53,15 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // 승부 판단 (0~10, 10 > 0)
+    // 승부 판단
     const getWinnerUid = (uidA, cardA, uidB, cardB) => {
-      if (cardA === cardB) return null; // 무승부
+      if (cardA === cardB) return null;
       if (cardA === 10 && cardB === 0) return uidA;
       if (cardB === 10 && cardA === 0) return uidB;
       return cardA < cardB ? uidA : uidB;
     };
 
-    // 스킬 정의 (설명은 기존 싱글 플레이 코드 기반)
+    // 스킬 정의
     const SKILL_DEFS = {
       'self-plus':  { id: 'self-plus',  name: '본인+1',  color: 'bg-green-600' },
       'self-minus': { id: 'self-minus', name: '본인-1',  color: 'bg-green-500' },
@@ -71,12 +69,11 @@
       'opp-minus':  { id: 'opp-minus',  name: '상대-1',  color: 'bg-red-500'   },
       'double':     { id: 'double',     name: '2배',     color: 'bg-yellow-600'},
       'random':     { id: 'random',     name: '랜덤',    color: 'bg-purple-600'}
-      // 'retrieve', 'nullify' 는 다음 단계에서 추가 예정
     };
     const SKILL_IDS = Object.keys(SKILL_DEFS);
     const randomSkillId = () => SKILL_IDS[Math.floor(Math.random() * SKILL_IDS.length)];
 
-    // 공통: 스킬 효과 계산 (숫자만)
+    // 스킬 효과 적용
     const applySkillValue = (val, skillId, storedRandom) => {
       if (val === null || val === undefined) return val;
       let v = Number(val);
@@ -103,7 +100,7 @@
     // ==================== App ====================
     const App = () => {
       const [user, setUser] = useState(null);
-      const [screen, setScreen] = useState('menu'); // menu, lobby, room, game
+      const [screen, setScreen] = useState('menu');
       const [playerName, setPlayerName] = useState('');
       const [currentRoomId, setCurrentRoomId] = useState(null);
 
@@ -113,6 +110,11 @@
           else auth.signInAnonymously();
         });
         return () => unsub();
+      }, []);
+
+      const handleExitToLobby = useCallback(() => {
+        setScreen('lobby');
+        setCurrentRoomId(null);
       }, []);
 
       if (!user) {
@@ -152,10 +154,7 @@
               playerName={playerName}
               roomId={currentRoomId}
               onGameStart={() => setScreen('game')}
-              onLeave={() => {
-                setScreen('lobby');
-                setCurrentRoomId(null);
-              }}
+              onLeave={handleExitToLobby}
             />
           )}
 
@@ -163,10 +162,7 @@
             <GameScreen
               user={user}
               roomId={currentRoomId}
-              onExit={() => {
-                setScreen('lobby');
-                setCurrentRoomId(null);
-              }}
+              onExit={handleExitToLobby}
             />
           )}
         </div>
@@ -222,21 +218,17 @@
           const data = snapshot.val();
           const list = [];
           const now = Date.now();
-          const EXPIRE_MS = 5 * 60 * 1000; // 5분
+          const EXPIRE_MS = 5 * 60 * 1000;
 
           if (data) {
             Object.entries(data).forEach(([roomId, room]) => {
-              // 5분 이상 대기 상태면 방 폭파
               if (room.status === 'waiting' && room.createdAt && (now - room.createdAt) > EXPIRE_MS) {
                 db.ref(`rooms/${roomId}`).remove();
                 return;
               }
-
-              // 유효성 체크
               if (!room.players || Object.keys(room.players).length === 0) return;
               if (!room.host || !room.host.uid) return;
               if (room.status !== 'waiting') return;
-
               list.push({ id: roomId, ...room });
             });
           }
@@ -368,7 +360,7 @@
         return () => {
           roomRef.off('value', listener);
         };
-      }, [roomId]);
+      }, [roomId, onLeave, onGameStart]);
 
       const handleLeave = async () => {
         if (!roomData) {
@@ -437,7 +429,6 @@
             </div>
 
             <div className="flex justify-between items-center mb-12">
-              {/* Me */}
               <div className="flex-1 flex flex-col items-center">
                 <div
                   className={`w-20 h-20 rounded-full mb-3 flex items-center justify-center text-2xl font-black border-4 ${
@@ -458,7 +449,6 @@
 
               <div className="text-2xl font-black text-slate-700 italic">VS</div>
 
-              {/* Opponent */}
               <div className="flex-1 flex flex-col items-center">
                 {opponent ? (
                   <>
@@ -535,81 +525,78 @@
       );
     };
 
-    // ==================== Game Screen (PVP + 스킬) ====================
+    // ==================== Game Screen ====================
     const GameScreen = ({ user, roomId, onExit }) => {
       const [roomData, setRoomData] = useState(null);
+      const [isInitializing, setIsInitializing] = useState(false);
+      const onExitRef = useRef(onExit);
+      
+      // ref 업데이트
+      useEffect(() => {
+        onExitRef.current = onExit;
+      }, [onExit]);
 
-      // 실시간 구독 + 호스트 초기화(게임/스킬)
+      // 실시간 구독
       useEffect(() => {
         const roomRef = db.ref(`rooms/${roomId}`);
 
-        const listener = roomRef.on('value', async (snapshot) => {
+        const listener = roomRef.on('value', (snapshot) => {
           const data = snapshot.val();
           if (!data) {
             alert("방이 종료되었습니다.");
-            onExit();
+            onExitRef.current();
             return;
           }
-
-          // 호스트가 게임이 아직 없으면 초기화 (손패/스코어/스킬)
-          const isHost = data.host && data.host.uid === user.uid;
-          if (isHost && !data.game && data.players) {
-            const gamePlayers = {};
-            Object.entries(data.players).forEach(([uid, p]) => {
-              gamePlayers[uid] = {
-                score: 0,
-                hand: [0,1,2,3,4,5,6,7,8,9,10],
-                selectedCard: null,
-                effectiveCard: null,
-                skills: [randomSkillId(), randomSkillId()] // 시작 스킬 2개
-              };
-            });
-            await roomRef.child('game').set({
-              maxRounds: 5,
-              currentRound: 1,
-              phase: 'select', // select, skill, result, finished
-              lastResult: null,
-              skillLog: null,
-              skillRequests: null,
-              players: gamePlayers
-            });
-            return;
-          }
-
           setRoomData(data);
         });
 
         return () => roomRef.off('value', listener);
-      }, [roomId, user.uid, onExit]);
+      }, [roomId]);
 
-      if (!roomData || !roomData.game) {
-        return (
-          <div className="min-h-screen flex items-center justify-center text-slate-400">
-            게임 준비 중...
-          </div>
-        );
-      }
-
-      const game = roomData.game;
-      const isHost = roomData.host && roomData.host.uid === user.uid;
-      const gamePlayers = game.players || {};
-      const myGame = gamePlayers[user.uid];
-      const oppUid = Object.keys(gamePlayers).find(uid => uid !== user.uid);
-      const oppGame = oppUid ? gamePlayers[oppUid] : null;
-
-      const myInfo = roomData.players[user.uid];
-      const oppInfo = oppUid ? roomData.players[oppUid] : null;
-
-      // ===== 호스트 로직 1: 둘 다 카드 선택되면 skill 페이즈로 전환 & effectiveCard 초기화 =====
+      // 호스트: 게임 초기화
       useEffect(() => {
-        if (!roomData || !roomData.game || !roomData.host) return;
-        const g = roomData.game;
-        const hostUid = roomData.host.uid;
-        if (hostUid !== user.uid) return;  // 호스트만
+        if (!roomData || !roomData.host || !roomData.players) return;
+        if (roomData.host.uid !== user.uid) return;
+        if (roomData.game) return;
+        if (isInitializing) return;
 
-        if (g.phase !== 'select') return;
-        const entries = Object.entries(g.players || {});
+        const initGame = async () => {
+          setIsInitializing(true);
+          const gamePlayers = {};
+          Object.entries(roomData.players).forEach(([uid, p]) => {
+            gamePlayers[uid] = {
+              score: 0,
+              hand: [0,1,2,3,4,5,6,7,8,9,10],
+              selectedCard: null,
+              effectiveCard: null,
+              skills: [randomSkillId(), randomSkillId()]
+            };
+          });
+          
+          await db.ref(`rooms/${roomId}/game`).set({
+            maxRounds: 5,
+            currentRound: 1,
+            phase: 'select',
+            lastResult: null,
+            skillLog: null,
+            skillRequests: null,
+            players: gamePlayers
+          });
+          setIsInitializing(false);
+        };
+
+        initGame();
+      }, [roomData, roomId, user.uid, isInitializing]);
+
+      // 호스트: 둘 다 카드 선택 → skill 페이즈
+      useEffect(() => {
+        if (!roomData?.game || !roomData?.host) return;
+        if (roomData.host.uid !== user.uid) return;
+        if (roomData.game.phase !== 'select') return;
+
+        const entries = Object.entries(roomData.game.players || {});
         if (entries.length < 2) return;
+        
         const allSelected = entries.every(([uid, p]) =>
           p.selectedCard !== null && p.selectedCard !== undefined
         );
@@ -627,30 +614,22 @@
         db.ref().update(updates);
       }, [roomData, roomId, user.uid]);
 
-      // ===== 호스트 로직 2: skillRequests 처리 (모든 스킬 효과 서버(호스트)에서만 적용) =====
+      // 호스트: skillRequests 처리
       useEffect(() => {
-        if (!roomData || !roomData.game || !roomData.host) return;
-        const g = roomData.game;
-        const hostUid = roomData.host.uid;
-        if (hostUid !== user.uid) return;  // 호스트만
-        if (g.phase !== 'skill') return;
-        if (!g.skillRequests) return;
+        if (!roomData?.game || !roomData?.host) return;
+        if (roomData.host.uid !== user.uid) return;
+        if (roomData.game.phase !== 'skill') return;
+        if (!roomData.game.skillRequests) return;
 
-        const entriesReq = Object.entries(g.skillRequests);
+        const entriesReq = Object.entries(roomData.game.skillRequests);
         if (entriesReq.length === 0) return;
 
         const basePath = `rooms/${roomId}/game`;
-        // 정렬 (timestamp 오름차순)
-        const sorted = entriesReq.sort((a, b) => {
-          const ta = a[1].createdAt || 0;
-          const tb = b[1].createdAt || 0;
-          return ta - tb;
-        });
+        const sorted = entriesReq.sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
 
-        // 로컬 게임 복사
-        const localGame = JSON.parse(JSON.stringify(g));
+        const localGame = JSON.parse(JSON.stringify(roomData.game));
         const updates = {};
-        const logArr = Array.isArray(localGame.skillLog) ? localGame.skillLog : [];
+        const logArr = Array.isArray(localGame.skillLog) ? [...localGame.skillLog] : [];
 
         for (const [reqId, req] of sorted) {
           const { uid, skillId } = req;
@@ -659,9 +638,8 @@
 
           const skillsArr = player.skills || [];
           const idx = skillsArr.indexOf(skillId);
-          if (idx === -1) continue; // 없는 스킬 요청은 무시
+          if (idx === -1) continue;
 
-          // 대상 플레이어 결정
           let targetUid = uid;
           if (skillId.startsWith('opp-')) {
             targetUid = Object.keys(localGame.players).find(x => x !== uid) || uid;
@@ -670,31 +648,24 @@
           const targetPlayer = localGame.players[targetUid];
           if (!targetPlayer) continue;
 
-          // 현재 값
-          let beforeVal = targetPlayer.effectiveCard;
-          if (beforeVal === null || beforeVal === undefined) {
-            beforeVal = targetPlayer.selectedCard;
-          }
+          let beforeVal = targetPlayer.effectiveCard ?? targetPlayer.selectedCard;
           if (beforeVal === null || beforeVal === undefined) continue;
 
           let storedRandom = undefined;
           if (skillId === 'random') {
-            storedRandom = Math.floor(Math.random() * 11); // 0~10
+            storedRandom = Math.floor(Math.random() * 11);
           }
 
           const afterVal = applySkillValue(beforeVal, skillId, storedRandom);
 
-          // 스킬 소비
           const newSkills = [...skillsArr];
           newSkills.splice(idx, 1);
           localGame.players[uid].skills = newSkills;
           updates[`${basePath}/players/${uid}/skills`] = newSkills;
 
-          // 값 반영
           localGame.players[targetUid].effectiveCard = afterVal;
           updates[`${basePath}/players/${targetUid}/effectiveCard`] = afterVal;
 
-          // 로그 추가 (단순)
           logArr.push({
             id: reqId,
             byUid: uid,
@@ -713,21 +684,20 @@
         db.ref().update(updates);
       }, [roomData, roomId, user.uid]);
 
-      // 카드 선택 (자기 것만)
+      // 카드 선택
       const selectCard = async (card) => {
-        if (!game || game.phase !== 'select') return;
-        if (!myGame || !myGame.hand || !myGame.hand.includes(card)) return;
+        if (!roomData?.game || roomData.game.phase !== 'select') return;
+        const myGame = roomData.game.players?.[user.uid];
+        if (!myGame || !myGame.hand?.includes(card)) return;
 
-        await db
-          .ref(`rooms/${roomId}/game/players/${user.uid}/selectedCard`)
-          .set(card);
+        await db.ref(`rooms/${roomId}/game/players/${user.uid}/selectedCard`).set(card);
       };
 
-      // 스킬 사용 요청 (자기 스킬만, skillRequests에 기록 → 호스트가 처리)
+      // 스킬 사용
       const useSkill = async (skillId) => {
-        if (!game || game.phase !== 'skill') return;
-        if (!myGame || !Array.isArray(myGame.skills)) return;
-        if (!myGame.skills.includes(skillId)) return;
+        if (!roomData?.game || roomData.game.phase !== 'skill') return;
+        const myGame = roomData.game.players?.[user.uid];
+        if (!myGame || !myGame.skills?.includes(skillId)) return;
 
         const reqRef = db.ref(`rooms/${roomId}/game/skillRequests`).push();
         await reqRef.set({
@@ -737,13 +707,13 @@
         });
       };
 
-      // 호스트: 결과 확정 (점수/스킬 지급/라운드 종료)
+      // 결과 확정 (호스트)
       const resolveRound = async () => {
-        if (!roomData || !roomData.game || !roomData.host) return;
-        if (roomData.host.uid !== user.uid) return; // 호스트만
-        const g = roomData.game;
-        if (g.phase !== 'skill') return;
+        if (!roomData?.game || !roomData?.host) return;
+        if (roomData.host.uid !== user.uid) return;
+        if (roomData.game.phase !== 'skill') return;
 
+        const g = roomData.game;
         const entries = Object.entries(g.players || {});
         if (entries.length < 2) return;
 
@@ -751,32 +721,29 @@
         const [uidA, pA] = entries[0];
         const [uidB, pB] = entries[1];
 
-        const effA = (pA.effectiveCard ?? pA.selectedCard);
-        const effB = (pB.effectiveCard ?? pB.selectedCard);
+        const effA = pA.effectiveCard ?? pA.selectedCard;
+        const effB = pB.effectiveCard ?? pB.selectedCard;
         if (effA === null || effA === undefined || effB === null || effB === undefined) return;
 
         const winnerUid = getWinnerUid(uidA, effA, uidB, effB);
 
         const updates = {};
-        // 점수
+        
         if (winnerUid) {
           const currentScore = g.players[winnerUid].score || 0;
           updates[`${basePath}/players/${winnerUid}/score`] = currentScore + 1;
         }
 
-        // 사용한 카드 제거
         const newHandA = (pA.hand || []).filter(c => c !== pA.selectedCard);
         const newHandB = (pB.hand || []).filter(c => c !== pB.selectedCard);
         updates[`${basePath}/players/${uidA}/hand`] = newHandA;
         updates[`${basePath}/players/${uidB}/hand`] = newHandB;
 
-        // 선택/효과 값 초기화 (다음 라운드를 위해)
         updates[`${basePath}/players/${uidA}/selectedCard`] = null;
         updates[`${basePath}/players/${uidB}/selectedCard`] = null;
         updates[`${basePath}/players/${uidA}/effectiveCard`] = null;
         updates[`${basePath}/players/${uidB}/effectiveCard`] = null;
 
-        // 스킬 지급 로직
         const giveSkill = (uid, count) => {
           if (!uid || count <= 0) return;
           const curSkills = Array.isArray(g.players[uid].skills) ? g.players[uid].skills : [];
@@ -785,8 +752,7 @@
           updates[`${basePath}/players/${uid}/skills`] = newSkills;
         };
 
-        const isTenVsZero =
-          (effA === 10 && effB === 0) || (effA === 0 && effB === 10);
+        const isTenVsZero = (effA === 10 && effB === 0) || (effA === 0 && effB === 10);
         const diff = Math.abs(effA - effB);
 
         if (winnerUid) {
@@ -796,12 +762,10 @@
             giveSkill(winnerUid, 1);
           }
         } else {
-          // 무승부 → 둘 다 1개
           giveSkill(uidA, 1);
           giveSkill(uidB, 1);
         }
 
-        // lastResult 저장 (선택값 + 최종값)
         const lastResult = {
           [uidA]: { selected: pA.selectedCard, effective: effA },
           [uidB]: { selected: pB.selectedCard, effective: effB },
@@ -814,28 +778,25 @@
         await db.ref().update(updates);
       };
 
-      // 다음 라운드 or 게임 종료 (호스트만)
+      // 다음 라운드 (호스트)
       const nextRoundOrFinish = async () => {
-        if (!roomData || !roomData.game || !roomData.host) return;
+        if (!roomData?.game || !roomData?.host) return;
         if (roomData.host.uid !== user.uid) return;
-        const g = roomData.game;
-        if (g.phase !== 'result') return;
+        if (roomData.game.phase !== 'result') return;
 
+        const g = roomData.game;
         const basePath = `rooms/${roomId}/game`;
         const entries = Object.entries(g.players || {});
         if (entries.length < 2) return;
+
         const [uidA, pA] = entries[0];
         const [uidB, pB] = entries[1];
 
-        const handsEmpty =
-          (pA.hand?.length || 0) === 0 ||
-          (pB.hand?.length || 0) === 0;
+        const handsEmpty = (pA.hand?.length || 0) === 0 || (pB.hand?.length || 0) === 0;
         const isLastRound = g.currentRound >= g.maxRounds;
 
         if (handsEmpty || isLastRound) {
-          await db.ref(basePath).update({
-            phase: 'finished'
-          });
+          await db.ref(basePath).update({ phase: 'finished' });
           return;
         }
 
@@ -843,27 +804,41 @@
         updates[`${basePath}/currentRound`] = g.currentRound + 1;
         updates[`${basePath}/phase`] = 'select';
         updates[`${basePath}/lastResult`] = null;
-        updates[`${basePath}/skillLog`] = g.skillLog || null; // 로그는 유지
 
         await db.ref().update(updates);
       };
 
+      // 나가기
       const handleExitGame = async () => {
-        if (roomId) {
-          const roomRef = db.ref(`rooms/${roomId}`);
-          const snap = await roomRef.get();
-          if (snap.exists()) {
-            const data = snap.val();
-            const amIHost = data.host && data.host.uid === user.uid;
-            if (amIHost) {
-              await roomRef.remove();
-            } else {
-              await roomRef.child(`players/${user.uid}`).remove();
-            }
+        if (roomId && roomData) {
+          const isHost = roomData.host?.uid === user.uid;
+          if (isHost) {
+            await db.ref(`rooms/${roomId}`).remove();
+          } else {
+            await db.ref(`rooms/${roomId}/players/${user.uid}`).remove();
           }
         }
-        onExit();
+        onExitRef.current();
       };
+
+      // 로딩
+      if (!roomData?.game) {
+        return (
+          <div className="min-h-screen flex items-center justify-center text-slate-400">
+            게임 준비 중...
+          </div>
+        );
+      }
+
+      const game = roomData.game;
+      const isHost = roomData.host?.uid === user.uid;
+      const gamePlayers = game.players || {};
+      const myGame = gamePlayers[user.uid];
+      const oppUid = Object.keys(gamePlayers).find(uid => uid !== user.uid);
+      const oppGame = oppUid ? gamePlayers[oppUid] : null;
+
+      const myInfo = roomData.players?.[user.uid];
+      const oppInfo = oppUid ? roomData.players?.[oppUid] : null;
 
       const phase = game.phase;
       const last = game.lastResult;
@@ -873,7 +848,7 @@
         if (!myGame?.selectedCard && (myGame?.hand?.length || 0) > 0) statusText = '카드를 선택하세요';
         else statusText = '상대가 카드를 선택할 때까지 대기 중...';
       } else if (phase === 'skill') {
-        statusText = '스킬을 사용해서 숫자를 조정하세요';
+        statusText = '스킬을 사용하세요 (호스트가 결과 확정)';
       } else if (phase === 'result' && last) {
         if (!last.winnerUid) statusText = '이 라운드 무승부!';
         else if (last.winnerUid === user.uid) statusText = '이 라운드 승리!';
@@ -886,32 +861,16 @@
         else statusText = '무승부로 종료!';
       }
 
-      const renderCard = (value, selected, disabled, onClick) => (
-        <button
-          key={value}
-          disabled={disabled}
-          onClick={onClick}
-          className={
-            `w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 text-lg sm:text-xl font-bold flex items-center justify-center 
-             transition-transform active:scale-95 mr-1 mb-1
-             ${selected ? 'border-yellow-400 bg-slate-100 text-slate-900' : 'border-slate-600 bg-slate-800 text-white'}
-             ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:border-blue-400'}`
-          }
-        >
-          {value}
-        </button>
-      );
-
       const mySkills = Array.isArray(myGame?.skills) ? myGame.skills : [];
 
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 animate-fade-in">
           <div className="w-full max-w-3xl glass rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-4">
-            {/* 상단: 상대 정보 & 스코어 */}
+            {/* 상단 */}
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-lg font-bold border border-slate-600">
-                  {oppInfo ? oppInfo.name[0] : '?'}
+                  {oppInfo?.name?.[0] ?? '?'}
                 </div>
                 <div>
                   <div className="text-xs text-slate-500">상대</div>
@@ -934,7 +893,7 @@
               </div>
             </div>
 
-            {/* 중앙: 상태 메시지 / 결과 */}
+            {/* 상태 메시지 */}
             <div className="text-center py-2">
               <p className="font-bold text-lg text-white mb-1">{statusText}</p>
               {phase === 'result' && last && oppUid && (
@@ -944,19 +903,19 @@
               )}
             </div>
 
-            {/* 중앙: 보드 (카드 보여주기) */}
+            {/* 카드 표시 */}
             <div className="flex justify-center gap-8 items-center py-2">
               <div className="flex flex-col items-center">
                 <div className="text-xs text-slate-400 mb-1">상대 카드</div>
-                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-slate-700 bg-slate-800 flex items-center justify-center text-xl font-bold">
-                  {phase === 'skill' || phase === 'result' || phase === 'finished'
+                <div className="w-14 h-20 rounded-lg border-2 border-slate-700 bg-slate-800 flex items-center justify-center text-xl font-bold">
+                  {(phase === 'skill' || phase === 'result' || phase === 'finished')
                     ? (oppGame?.effectiveCard ?? oppGame?.selectedCard ?? '?')
                     : '?'}
                 </div>
               </div>
               <div className="flex flex-col items-center">
                 <div className="text-xs text-slate-400 mb-1">내 카드</div>
-                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-blue-400 bg-slate-100 flex items-center justify-center text-xl font-bold text-slate-900">
+                <div className="w-14 h-20 rounded-lg border-2 border-blue-400 bg-slate-100 flex items-center justify-center text-xl font-bold text-slate-900">
                   {myGame?.effectiveCard ?? myGame?.selectedCard ?? '-'}
                 </div>
               </div>
@@ -976,7 +935,7 @@
                         key={idx}
                         disabled={phase !== 'skill'}
                         onClick={() => useSkill(skillId)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${def.color} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        className={`px-3 py-1 rounded-full text-xs font-bold text-white ${def.color} disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
                         {def.name}
                       </button>
@@ -989,15 +948,21 @@
             {/* 내 손패 */}
             <div>
               <div className="text-xs text-slate-400 mb-1">내 손패</div>
-              <div className="flex flex-wrap">
-                {(myGame?.hand ?? []).map(card =>
-                  renderCard(
-                    card,
-                    myGame?.selectedCard === card,
-                    phase !== 'select',
-                    () => selectCard(card)
-                  )
-                )}
+              <div className="flex flex-wrap gap-1">
+                {(myGame?.hand ?? []).map(card => (
+                  <button
+                    key={card}
+                    disabled={phase !== 'select'}
+                    onClick={() => selectCard(card)}
+                    className={`w-12 h-16 rounded-lg border-2 text-lg font-bold flex items-center justify-center transition-transform active:scale-95
+                      ${myGame?.selectedCard === card
+                        ? 'border-yellow-400 bg-slate-100 text-slate-900'
+                        : 'border-slate-600 bg-slate-800 text-white'}
+                      ${phase !== 'select' ? 'opacity-40 cursor-not-allowed' : 'hover:border-blue-400'}`}
+                  >
+                    {card}
+                  </button>
+                ))}
                 {(!myGame?.hand || myGame.hand.length === 0) && (
                   <div className="text-slate-500 text-sm">손패가 없습니다.</div>
                 )}
