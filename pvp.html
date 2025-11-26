@@ -3,34 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Zero Point: PVP Lobby</title>
+  <title>Zero Point: PVP</title>
   
+  <!-- 라이브러리 로드 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   
+  <!-- Firebase 호환 모듈 -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background-color: #0f172a; color: white; }
+    /* 기본 스타일 및 애니메이션 */
+    body { font-family: system-ui, -apple-system, sans-serif; background-color: #0f172a; color: white; -webkit-tap-highlight-color: transparent; }
     .animate-fade-in { animation: fadeIn 0.5s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
-    /* 스크롤바 꾸미기 */
-    ::-webkit-scrollbar { width: 8px; }
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #1e293b; }
-    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    
+    /* 유틸리티 */
+    .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
   </style>
 </head>
 <body>
   <div id="root"></div>
   
   <script type="text/babel">
-    // 1. Firebase 설정 (Step 1과 동일)
+    const { useState, useEffect } = React;
+
+    // 1. Firebase 설정 (Step 1에서 만든 프로젝트 정보)
     const firebaseConfig = {
       apiKey: "AIzaSyAy9neN8_-8HWZNcQluP6jGbzNQMICWc6s",
       authDomain: "zero-pvp.firebaseapp.com",
@@ -41,32 +48,50 @@
       databaseURL: "https://zero-pvp-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
 
+    // Firebase 초기화 (중복 방지)
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
     const auth = firebase.auth();
     const db = firebase.database();
 
-    const { useState, useEffect } = React;
-
+    // ==========================================
+    // 메인 앱 컴포넌트
+    // ==========================================
     const App = () => {
       const [user, setUser] = useState(null);
-      const [screen, setScreen] = useState('menu'); // menu -> lobby -> room
+      const [screen, setScreen] = useState('menu'); // menu -> lobby -> room -> game
       const [playerName, setPlayerName] = useState('');
       const [currentRoomId, setCurrentRoomId] = useState(null);
       const [isHost, setIsHost] = useState(false);
 
+      // 초기 인증 처리
       useEffect(() => {
-        auth.onAuthStateChanged(u => {
-          if (u) setUser(u);
-          else auth.signInAnonymously();
+        const unsubscribe = auth.onAuthStateChanged(u => {
+          if (u) {
+            setUser(u);
+          } else {
+            auth.signInAnonymously().catch(console.error);
+          }
         });
+        return () => unsubscribe();
       }, []);
 
-      if (!user) return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>;
+      if (!user) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center space-y-4 text-slate-400">
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p>서버 연결 중...</p>
+          </div>
+        );
+      }
 
       return (
-        <div className="min-h-screen bg-slate-900">
+        <div className="min-h-screen bg-slate-900 text-white overflow-hidden relative">
+          {/* 배경 효과 */}
+          <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" 
+               style={{backgroundImage: 'radial-gradient(circle at 50% 50%, #3b82f6 0%, transparent 50%)'}}></div>
+
           {screen === 'menu' && (
             <MenuScreen 
               onStart={(name) => {
@@ -95,7 +120,7 @@
               playerName={playerName}
               roomId={currentRoomId}
               isHost={isHost}
-              onGameStart={() => setScreen('game')} // 게임 시작 콜백 추가
+              onGameStart={() => setScreen('game')}
               onLeave={() => {
                 setScreen('lobby');
                 setCurrentRoomId(null);
@@ -103,42 +128,71 @@
             />
           )}
 
-{screen === 'game' && (
-  <GameScreen
-    user={user}
-    roomId={currentRoomId}
-    isHost={isHost}
-    onExit={() => {
-      setScreen('lobby');
-      setCurrentRoomId(null);
-    }}
-  />
-)}
-        </div>
-      );
-    };
-
-    const MenuScreen = ({ onStart }) => {
-      const [name, setName] = useState('');
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in">
-          <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-8">ZERO PVP</h1>
-          <form onSubmit={(e) => { e.preventDefault(); if(name.trim().length >= 2) onStart(name.trim()); }} className="w-full max-w-xs flex flex-col gap-4">
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="닉네임 (2자 이상)" className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-center text-white focus:border-blue-500 outline-none" maxLength={8} />
-            <button type="submit" disabled={name.trim().length < 2} className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold rounded-lg transition-all active:scale-95">시작하기</button>
-          </form>
+          {screen === 'game' && (
+            <GameScreen
+              user={user}
+              roomId={currentRoomId}
+              isHost={isHost}
+              onExit={() => {
+                setScreen('lobby');
+                setCurrentRoomId(null);
+              }}
+            />
+          )}
         </div>
       );
     };
 
     // ==========================================
-    // 2. 로비 화면 (핵심 구현 부분)
+    // 화면 1: 메뉴 (닉네임 입력)
+    // ==========================================
+    const MenuScreen = ({ onStart }) => {
+      const [name, setName] = useState('');
+      
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if(name.trim().length >= 2) onStart(name.trim());
+      };
+
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in relative z-10">
+          <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-4 tracking-tighter">
+            ZERO
+          </h1>
+          <p className="text-slate-400 mb-12 font-light tracking-widest text-sm">PVP STRATEGY CARD GAME</p>
+
+          <form onSubmit={handleSubmit} className="w-full max-w-xs flex flex-col gap-4 glass p-6 rounded-2xl shadow-2xl">
+            <div className="text-center">
+              <label className="block text-xs text-slate-400 mb-2 uppercase font-bold">Player Name</label>
+              <input 
+                type="text" 
+                value={name} 
+                onChange={e => setName(e.target.value)} 
+                placeholder="닉네임을 입력하세요" 
+                className="w-full px-4 py-3 bg-slate-800/80 border border-slate-600 rounded-xl text-center text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" 
+                maxLength={8} 
+              />
+            </div>
+            <button 
+              type="submit" 
+              disabled={name.trim().length < 2} 
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20 active:scale-95"
+            >
+              ENTER GAME
+            </button>
+          </form>
+          <p className="mt-8 text-xs text-slate-600">Ver 2.0 (Multiplayer)</p>
+        </div>
+      );
+    };
+
+    // ==========================================
+    // 화면 2: 로비 (방 목록/생성)
     // ==========================================
     const LobbyScreen = ({ user, playerName, onBack, onJoinRoom }) => {
       const [rooms, setRooms] = useState([]);
       const [loading, setLoading] = useState(true);
 
-      // 방 목록 실시간 구독
       useEffect(() => {
         const roomsRef = db.ref('rooms');
         const listener = roomsRef.on('value', (snapshot) => {
@@ -146,116 +200,87 @@
           const roomList = [];
           if (data) {
             Object.entries(data).forEach(([id, room]) => {
-              // 대기 중(waiting)인 방만 보여줌
-              if (room.status === 'waiting') {
+              // 1시간 지난 방은 안 보여줌 (필터링)
+              const isOld = Date.now() - room.createdAt > 3600000;
+              if (room.status === 'waiting' && !isOld) {
                 roomList.push({ id, ...room });
               }
             });
           }
-          // 최신순 정렬
           roomList.sort((a, b) => b.createdAt - a.createdAt);
           setRooms(roomList);
           setLoading(false);
         });
-
         return () => roomsRef.off('value', listener);
       }, []);
 
-      // 방 만들기 함수
       const createRoom = async () => {
         const newRoomRef = db.ref('rooms').push();
-        const roomData = {
+        await newRoomRef.set({
           status: 'waiting',
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          host: {
-            uid: user.uid,
-            name: playerName
-          },
+          host: { uid: user.uid, name: playerName },
           players: {
-            [user.uid]: {
-              name: playerName,
-              ready: false
-            }
+            [user.uid]: { name: playerName, ready: false }
           }
-        };
-        
-        await newRoomRef.set(roomData);
-        onJoinRoom(newRoomRef.key, true); // true = 방장(Host)
+        });
+        onJoinRoom(newRoomRef.key, true);
       };
 
-      // 방 참가 함수
       const joinRoom = async (roomId) => {
-        // 방이 꽉 찼는지 확인 (트랜잭션으로 안전하게 처리)
         const roomRef = db.ref(`rooms/${roomId}`);
-        
         try {
-          const snapshot = await roomRef.get();
-          if (!snapshot.exists()) return alert("사라진 방입니다.");
-          
-          const room = snapshot.val();
+          const snap = await roomRef.get();
+          if (!snap.exists()) return alert("사라진 방입니다.");
+          const room = snap.val();
           if (Object.keys(room.players || {}).length >= 2) return alert("방이 꽉 찼습니다.");
           if (room.status !== 'waiting') return alert("이미 시작된 게임입니다.");
 
-          // 입장 처리
-          await roomRef.child(`players/${user.uid}`).set({
-            name: playerName,
-            ready: false
-          });
-          
-          onJoinRoom(roomId, false); // false = 게스트
+          await roomRef.child(`players/${user.uid}`).set({ name: playerName, ready: false });
+          onJoinRoom(roomId, false);
         } catch (e) {
           console.error(e);
-          alert("입장 실패");
+          alert("입장 오류");
         }
       };
 
       return (
-        <div className="flex flex-col items-center min-h-screen p-4 animate-fade-in bg-slate-900">
-          <header className="w-full max-w-2xl flex justify-between items-center py-4 mb-6 border-b border-slate-800">
-            <button onClick={onBack} className="text-slate-400 hover:text-white">← 나가기</button>
-            <h2 className="font-bold text-xl text-white">대기실 로비</h2>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs text-slate-400">{rooms.length}명 대기중</span>
-            </div>
+        <div className="flex flex-col min-h-screen p-4 animate-fade-in max-w-2xl mx-auto relative z-10">
+          <header className="flex justify-between items-center py-6">
+            <button onClick={onBack} className="text-slate-400 hover:text-white font-bold">← EXIT</button>
+            <h2 className="font-bold text-xl tracking-widest">LOBBY</h2>
+            <div className="w-10"></div>
           </header>
 
-          <div className="w-full max-w-2xl mb-6 flex justify-between items-center bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+          <div className="glass p-6 rounded-2xl mb-6 flex justify-between items-center shadow-lg">
             <div>
-              <p className="text-sm text-slate-400">내 닉네임</p>
-              <p className="font-bold text-lg text-blue-400">{playerName}</p>
+              <p className="text-xs text-slate-400 uppercase font-bold">My Profile</p>
+              <p className="text-xl font-bold text-blue-400">{playerName}</p>
             </div>
-            <button 
-              onClick={createRoom}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-blue-900/30 active:scale-95 transition-all flex items-center gap-2"
-            >
-              <span>+ 방 만들기</span>
+            <button onClick={createRoom} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-900/30 active:scale-95 transition-all">
+              + CREATE ROOM
             </button>
           </div>
 
-          <div className="w-full max-w-2xl flex-1 overflow-y-auto space-y-3 pb-10">
+          <div className="flex-1 overflow-y-auto space-y-3 pb-10 custom-scroll">
             {loading ? (
-              <div className="text-center text-slate-500 py-10">방 목록 불러오는 중...</div>
+              <div className="text-center py-20 text-slate-500">Loading rooms...</div>
             ) : rooms.length === 0 ? (
-              <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-xl">
-                <p className="text-slate-500 text-lg mb-2">대기 중인 방이 없습니다.</p>
-                <p className="text-slate-600 text-sm">새로운 방을 만들어보세요!</p>
+              <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl text-slate-500">
+                방이 없습니다. 첫 번째 방을 만들어보세요!
               </div>
             ) : (
               rooms.map(room => (
-                <div key={room.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center hover:border-slate-600 transition-colors">
+                <div key={room.id} className="bg-slate-800/80 hover:bg-slate-800 p-5 rounded-xl border border-slate-700 flex justify-between items-center transition-all group">
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-white text-lg">{room.host.name}님의 게임</span>
-                      <span className="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded">1/2</span>
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="font-bold text-lg text-white group-hover:text-blue-400 transition-colors">{room.host.name}</span>
+                      <span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">Waiting</span>
                     </div>
-                    <span className="text-slate-500 text-xs font-mono">ID: {room.id.slice(-4)}</span>
+                    <span className="text-xs text-slate-500 font-mono">#{room.id.slice(-4)}</span>
                   </div>
-                  <button 
-                    onClick={() => joinRoom(room.id)}
-                    className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    입장하기
+                  <button onClick={() => joinRoom(room.id)} className="px-6 py-2 bg-slate-700 hover:bg-green-600 text-white rounded-lg font-bold text-sm transition-colors">
+                    JOIN
                   </button>
                 </div>
               ))
@@ -266,45 +291,149 @@
     };
 
     // ==========================================
-    // 3. 대기실 (임시 표시용 - Step 3에서 완성)
+    // 화면 3: 대기실 (동기화 및 시작)
     // ==========================================
-    const WaitingRoom = ({ user, roomId, isHost, onLeave }) => {
-      // 나갈 때 방에서 내 정보 삭제
-      const leaveRoom = async () => {
-        if (!roomId) return;
+    const WaitingRoom = ({ user, playerName, roomId, isHost, onLeave, onGameStart }) => {
+      const [roomData, setRoomData] = useState(null);
+      const [isReady, setIsReady] = useState(false);
+
+      useEffect(() => {
         const roomRef = db.ref(`rooms/${roomId}`);
-        
-        if (isHost) {
-          // 방장이 나가면 방 삭제 (간단한 처리)
-          await roomRef.remove();
-        } else {
-          // 게스트가 나가면 플레이어 목록에서만 삭제
-          await roomRef.child(`players/${user.uid}`).remove();
+        const listener = roomRef.on('value', (snapshot) => {
+          const data = snapshot.val();
+          if (!data) { alert("방이 삭제되었습니다."); onLeave(); return; }
+          setRoomData(data);
+          if (data.status === 'playing') onGameStart();
+        });
+        return () => roomRef.off('value', listener);
+      }, [roomId]);
+
+      const handleLeave = async () => {
+        if (!roomId) return;
+        if (isHost) await db.ref(`rooms/${roomId}`).remove();
+        else {
+          const updates = {};
+          updates[`rooms/${roomId}/players/${user.uid}`] = null;
+          updates[`rooms/${roomId}/status`] = 'waiting'; // 혹시 시작 중이었다면 취소
+          await db.ref().update(updates);
         }
         onLeave();
       };
 
+      const toggleReady = async () => {
+        const newState = !isReady;
+        setIsReady(newState);
+        await db.ref(`rooms/${roomId}/players/${user.uid}/ready`).set(newState);
+      };
+
+      const startGame = async () => {
+        await db.ref(`rooms/${roomId}`).update({
+          status: 'playing',
+          startedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+      };
+
+      if (!roomData || !roomData.players) return <div className="min-h-screen flex items-center justify-center">Loading room...</div>;
+
+      const players = Object.values(roomData.players);
+      const opponent = players.find(p => p.name !== playerName);
+      const amIReady = roomData.players[user.uid]?.ready;
+      const isEveryoneReady = players.length === 2 && players.every(p => p.ready);
+
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900">
-          <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 max-w-md w-full text-center shadow-2xl">
-            <h2 className="text-2xl font-bold mb-2">게임 대기 중...</h2>
-            <p className="text-slate-400 text-sm mb-8 font-mono">ROOM ID: {roomId}</p>
-            
-            <div className="py-10">
-              <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-300">상대방을 기다리는 중입니다.</p>
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-900 animate-fade-in relative z-10">
+          <div className="w-full max-w-lg glass rounded-3xl p-8 shadow-2xl border-t border-slate-700">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-white mb-1">WAITING ROOM</h2>
+              <p className="text-slate-500 text-xs font-mono tracking-widest uppercase">ID: {roomId}</p>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <button className="w-full py-3 bg-gray-700 text-gray-400 cursor-not-allowed rounded-lg font-bold" disabled>
-                게임 시작 (준비중)
-              </button>
-              <button onClick={leaveRoom} className="w-full py-3 border border-slate-600 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">
-                나가기
+            <div className="flex justify-between items-center mb-12 gap-4 relative">
+              {/* 나 */}
+              <div className="flex-1 flex flex-col items-center z-10">
+                <div className={`w-24 h-24 rounded-full mb-4 flex items-center justify-center text-3xl font-black border-4 transition-all shadow-xl
+                  ${amIReady ? 'border-green-500 bg-green-900/20 text-green-400 shadow-green-500/20' : 'border-blue-500 bg-slate-800 text-blue-400'}`}>
+                  {playerName[0]}
+                </div>
+                <span className="font-bold text-white text-lg mb-1">{playerName}</span>
+                <span className={`text-xs px-3 py-1 rounded-full font-bold ${amIReady ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                  {amIReady ? 'READY' : 'WAITING'}
+                </span>
+              </div>
+
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-700 text-4xl font-black italic z-0">VS</div>
+
+              {/* 상대방 */}
+              <div className="flex-1 flex flex-col items-center z-10">
+                {opponent ? (
+                  <>
+                    <div className={`w-24 h-24 rounded-full mb-4 flex items-center justify-center text-3xl font-black border-4 transition-all shadow-xl
+                      ${opponent.ready ? 'border-green-500 bg-green-900/20 text-green-400 shadow-green-500/20' : 'border-red-500 bg-slate-800 text-red-400'}`}>
+                      {opponent.name[0]}
+                    </div>
+                    <span className="font-bold text-white text-lg mb-1">{opponent.name}</span>
+                    <span className={`text-xs px-3 py-1 rounded-full font-bold ${opponent.ready ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                      {opponent.ready ? 'READY' : 'WAITING'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-24 h-24 rounded-full mb-4 flex items-center justify-center bg-slate-800/50 border-4 border-dashed border-slate-700 animate-pulse">
+                      <span className="text-slate-600 text-3xl font-bold">?</span>
+                    </div>
+                    <span className="text-slate-500 text-sm">Waiting for<br/>Opponent...</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {isHost ? (
+                <button 
+                  onClick={startGame} 
+                  disabled={!isEveryoneReady}
+                  className={`w-full py-4 rounded-2xl font-black text-lg tracking-wide transition-all shadow-lg
+                    ${isEveryoneReady 
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:scale-105 active:scale-95 text-white shadow-green-900/30 animate-pulse' 
+                      : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
+                >
+                  {isEveryoneReady ? 'START GAME' : 'WAITING FOR READY'}
+                </button>
+              ) : (
+                <button 
+                  onClick={toggleReady}
+                  className={`w-full py-4 rounded-2xl font-black text-lg tracking-wide transition-all shadow-lg active:scale-95
+                    ${isReady 
+                      ? 'bg-slate-700 text-slate-400 hover:bg-slate-600' 
+                      : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/30'}`}
+                >
+                  {isReady ? 'CANCEL READY' : 'READY UP!'}
+                </button>
+              )}
+
+              <button 
+                onClick={handleLeave}
+                className="w-full py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-800 hover:text-white transition-colors text-sm"
+              >
+                LEAVE ROOM
               </button>
             </div>
-            <p className="text-slate-600 text-xs mt-4">Step 3에서 대기실 동기화가 구현됩니다.</p>
           </div>
+        </div>
+      );
+    };
+
+    // ==========================================
+    // 화면 4: 게임 화면 (Step 4에서 구현 예정)
+    // ==========================================
+    const GameScreen = ({ user, roomId, isHost, onExit }) => {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-black animate-fade-in relative z-20">
+          <h1 className="text-5xl font-black text-yellow-400 mb-4 animate-bounce">GAME START!</h1>
+          <p className="text-slate-400 mb-8 text-center">Step 4에서<br/>실제 게임 로직이 구현됩니다.</p>
+          <button onClick={onExit} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full">
+            나가기
+          </button>
         </div>
       );
     };
