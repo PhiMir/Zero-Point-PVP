@@ -92,14 +92,28 @@
           {screen === 'room' && (
             <WaitingRoom
               user={user}
+              playerName={playerName}
               roomId={currentRoomId}
               isHost={isHost}
+              onGameStart={() => setScreen('game')} // 게임 시작 콜백 추가
               onLeave={() => {
                 setScreen('lobby');
                 setCurrentRoomId(null);
               }}
             />
           )}
+
+{screen === 'game' && (
+  <GameScreen
+    user={user}
+    roomId={currentRoomId}
+    isHost={isHost}
+    onExit={() => {
+      setScreen('lobby');
+      setCurrentRoomId(null);
+    }}
+  />
+)}
         </div>
       );
     };
