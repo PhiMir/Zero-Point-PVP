@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Zero Point: PVP Stable</title>
+  <title>Zero Point: PVP</title>
   
   <!-- React / Babel / Tailwind -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -17,10 +17,22 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background-color: #0f172a; color: white; -webkit-tap-highlight-color: transparent; }
-    .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .glass { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.3); }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #0f172a;
+      color: white;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .animate-fade-in { animation: fadeIn 0.35s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .glass {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
   </style>
 </head>
 <body>
@@ -39,10 +51,17 @@
       appId: "1:634718710928:web:b5339abd5d443c1ca83c15",
       databaseURL: "https://zero-pvp-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
-
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
+
+    // 승부 판단 (0~10, 10 > 0)
+    const getWinnerUid = (uidA, cardA, uidB, cardB) => {
+      if (cardA === cardB) return null; // 무승부
+      if (cardA === 10 && cardB === 0) return uidA;
+      if (cardB === 10 && cardA === 0) return uidB;
+      return cardA < cardB ? uidA : uidB;
+    };
 
     // ==================== App ====================
     const App = () => {
@@ -128,24 +147,28 @@
 
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in">
-          <h1 className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-purple-500 mb-8">
+          <h1 className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-3 tracking-tight">
             ZERO
           </h1>
+          <p className="text-slate-400 mb-10 text-xs tracking-[0.35em] uppercase">
+            Point PvP
+          </p>
+
           <form onSubmit={handleSubmit} className="w-full max-w-xs glass p-6 rounded-2xl flex flex-col gap-4">
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="닉네임 (2자 이상)"
+              placeholder="닉네임 (2~8자)"
               maxLength={8}
-              className="w-full px-4 py-3 bg-slate-800 rounded-xl text-center text-white outline-none"
+              className="w-full px-4 py-3 bg-slate-800 rounded-xl text-center text-white outline-none border border-slate-700 focus:border-blue-500"
             />
             <button
               type="submit"
               disabled={name.trim().length < 2}
               className="w-full py-3 bg-blue-600 rounded-xl font-bold disabled:opacity-50"
             >
-              GAME START
+              ENTER LOBBY
             </button>
           </form>
         </div>
@@ -161,12 +184,22 @@
         const listener = roomsRef.on('value', (snapshot) => {
           const data = snapshot.val();
           const list = [];
+          const now = Date.now();
+          const EXPIRE_MS = 5 * 60 * 1000; // 5분
+
           if (data) {
             Object.entries(data).forEach(([roomId, room]) => {
-              // 플레이어가 없거나 host 정보 없으면 스킵 (유령방 필터)
+              // 5분 이상 대기 상태면 방 폭파
+              if (room.status === 'waiting' && room.createdAt && (now - room.createdAt) > EXPIRE_MS) {
+                db.ref(`rooms/${roomId}`).remove();
+                return;
+              }
+
+              // 유효성 체크
               if (!room.players || Object.keys(room.players).length === 0) return;
               if (!room.host || !room.host.uid) return;
               if (room.status !== 'waiting') return;
+
               list.push({ id: roomId, ...room });
             });
           }
@@ -181,21 +214,14 @@
         const roomRef = db.ref('rooms').push();
         const roomId = roomRef.key;
 
-        // 방 기본 정보
         await roomRef.set({
           status: 'waiting',
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          host: { uid: user.uid, name: playerName },
+          host: { uid: user.uid, name: playerName }
         });
 
-        // 플레이어 정보 (방장도 players에 포함)
         const playerRef = roomRef.child(`players/${user.uid}`);
-        await playerRef.set({
-          name: playerName,
-          ready: false,
-        });
-
-        // 예상치 못한 종료 시: 내 player 엔트리 제거
+        await playerRef.set({ name: playerName, ready: false });
         playerRef.onDisconnect().remove();
 
         onJoinRoom(roomId);
@@ -215,19 +241,13 @@
           alert("플레이어 정보가 없는 방입니다.");
           return;
         }
-
         if (Object.keys(room.players).length >= 2) {
           alert("이미 2명이 가득 찼습니다.");
           return;
         }
 
         const playerRef = roomRef.child(`players/${user.uid}`);
-        await playerRef.set({
-          name: playerName,
-          ready: false,
-        });
-
-        // 예상치 못한 종료 시: 내 player 엔트리 제거
+        await playerRef.set({ name: playerName, ready: false });
         playerRef.onDisconnect().remove();
 
         onJoinRoom(roomId);
@@ -236,8 +256,8 @@
       return (
         <div className="min-h-screen p-4 max-w-2xl mx-auto animate-fade-in">
           <header className="flex justify-between items-center py-6">
-            <button onClick={onBack} className="text-slate-400">← EXIT</button>
-            <h2 className="font-bold text-xl">LOBBY</h2>
+            <button onClick={onBack} className="text-slate-400 hover:text-white">← EXIT</button>
+            <h2 className="font-bold text-xl tracking-[0.3em] uppercase text-slate-100">Lobby</h2>
             <div className="w-10"></div>
           </header>
 
@@ -256,12 +276,14 @@
 
           <div className="space-y-3">
             {rooms.length === 0 ? (
-              <div className="text-center py-10 text-slate-500">대기 중인 방이 없습니다.</div>
+              <div className="text-center py-10 text-slate-500">
+                대기 중인 방이 없습니다.
+              </div>
             ) : (
               rooms.map(room => (
                 <div
                   key={room.id}
-                  className="bg-slate-800 p-5 rounded-xl flex justify-between items-center border border-slate-700"
+                  className="bg-slate-800/90 p-5 rounded-xl flex justify-between items-center border border-slate-700"
                 >
                   <div>
                     <div className="font-bold text-lg text-white">
@@ -308,7 +330,6 @@
 
         return () => {
           roomRef.off('value', listener);
-          // onDisconnect는 여기서 cancel 하지 않음
         };
       }, [roomId]);
 
@@ -318,9 +339,9 @@
           return;
         }
         const roomRef = db.ref(`rooms/${roomId}`);
-        const amIHost = roomData.host && roomData.host.uid === user.uid;
+        const isHost = roomData.host && roomData.host.uid === user.uid;
 
-        if (amIHost) {
+        if (isHost) {
           await roomRef.remove();
         } else {
           await roomRef.child(`players/${user.uid}`).remove();
@@ -335,7 +356,9 @@
       };
 
       const startGame = async () => {
-        await db.ref(`rooms/${roomId}`).update({
+        if (!roomData) return;
+        const roomRef = db.ref(`rooms/${roomId}`);
+        await roomRef.update({
           status: 'playing',
           startedAt: firebase.database.ServerValue.TIMESTAMP
         });
@@ -475,16 +498,152 @@
       );
     };
 
-    // ==================== Game Screen (종료 시 방 정리) ====================
+    // ==================== Game Screen (PVP 카드 배틀) ====================
     const GameScreen = ({ user, roomId, onExit }) => {
+      const [roomData, setRoomData] = useState(null);
+
+      useEffect(() => {
+        const roomRef = db.ref(`rooms/${roomId}`);
+
+        const listener = roomRef.on('value', async (snapshot) => {
+          const data = snapshot.val();
+          if (!data) {
+            alert("방이 종료되었습니다.");
+            onExit();
+            return;
+          }
+
+          // 호스트가 게임 데이터 없을 때 초기화
+          const isHost = data.host && data.host.uid === user.uid;
+          if (isHost && !data.game && data.players) {
+            const gamePlayers = {};
+            Object.entries(data.players).forEach(([uid, p]) => {
+              gamePlayers[uid] = {
+                score: 0,
+                hand: [0,1,2,3,4,5,6,7,8,9,10],
+                selectedCard: null
+              };
+            });
+            await roomRef.child('game').set({
+              maxRounds: 5,
+              currentRound: 1,
+              phase: 'select', // select, result, finished
+              lastResult: null,
+              players: gamePlayers
+            });
+            return; // 다음 스냅샷에서 다시 읽음
+          }
+
+          setRoomData(data);
+        });
+
+        return () => roomRef.off('value', listener);
+      }, [roomId, user.uid]);
+
+      // 카드 선택
+      const selectCard = async (card) => {
+        if (!roomData || !roomData.game) return;
+        const game = roomData.game;
+        if (game.phase !== 'select') return;
+
+        const myState = game.players[user.uid];
+        if (!myState) return;
+        if (!myState.hand || !myState.hand.includes(card)) return;
+
+        await db.ref(`rooms/${roomId}/game/players/${user.uid}/selectedCard`).set(card);
+      };
+
+      // 호스트만 라운드 결과 계산
+      useEffect(() => {
+        if (!roomData || !roomData.game || !roomData.host) return;
+        const game = roomData.game;
+        const isHost = roomData.host.uid === user.uid;
+        if (!isHost) return;
+        if (game.phase !== 'select') return;
+
+        const entries = Object.entries(game.players || {});
+        if (entries.length < 2) return;
+
+        const allSelected = entries.every(([uid, p]) =>
+          p.selectedCard !== null && p.selectedCard !== undefined
+        );
+        if (!allSelected) return;
+
+        // 결과 계산
+        const [uidA, pA] = entries[0];
+        const [uidB, pB] = entries[1];
+        const cardA = pA.selectedCard;
+        const cardB = pB.selectedCard;
+        const winnerUid = getWinnerUid(uidA, cardA, uidB, cardB);
+
+        const updates = {};
+        const basePath = `rooms/${roomId}/game`;
+
+        // 점수
+        if (winnerUid) {
+          const currentScore = game.players[winnerUid].score || 0;
+          updates[`${basePath}/players/${winnerUid}/score`] = currentScore + 1;
+        }
+
+        // 사용한 카드 제거
+        const newHandA = (pA.hand || []).filter(c => c !== cardA);
+        const newHandB = (pB.hand || []).filter(c => c !== cardB);
+        updates[`${basePath}/players/${uidA}/hand`] = newHandA;
+        updates[`${basePath}/players/${uidB}/hand`] = newHandB;
+
+        // 결과 기록
+        updates[`${basePath}/lastResult`] = {
+          [uidA]: cardA,
+          [uidB]: cardB,
+          winnerUid,
+          round: game.currentRound
+        };
+        updates[`${basePath}/phase`] = 'result';
+
+        db.ref().update(updates);
+      }, [roomData, user.uid, roomId]);
+
+      const handleNextRound = async () => {
+        if (!roomData || !roomData.game) return;
+        const game = roomData.game;
+        const basePath = `rooms/${roomId}/game`;
+        const entries = Object.entries(game.players || {});
+        if (entries.length < 2) return;
+
+        const [uidA, pA] = entries[0];
+        const [uidB, pB] = entries[1];
+
+        const handsEmpty =
+          (pA.hand?.length || 0) === 0 ||
+          (pB.hand?.length || 0) === 0;
+
+        const isLastRound = game.currentRound >= game.maxRounds;
+
+        if (handsEmpty || isLastRound) {
+          // 게임 종료
+          await db.ref(basePath).update({
+            phase: 'finished'
+          });
+          return;
+        }
+
+        const updates = {};
+        updates[`${basePath}/currentRound`] = game.currentRound + 1;
+        updates[`${basePath}/phase`] = 'select';
+        updates[`${basePath}/players/${uidA}/selectedCard`] = null;
+        updates[`${basePath}/players/${uidB}/selectedCard`] = null;
+
+        await db.ref().update(updates);
+      };
+
       const handleExitGame = async () => {
         if (roomId) {
           const roomRef = db.ref(`rooms/${roomId}`);
           const snap = await roomRef.get();
           if (snap.exists()) {
             const data = snap.val();
-            const amIHost = data.host && data.host.uid === user.uid;
-            if (amIHost) {
+            const isHost = data.host && data.host.uid === user.uid;
+            if (isHost) {
               await roomRef.remove();
             } else {
               await roomRef.child(`players/${user.uid}`).remove();
@@ -494,20 +653,164 @@
         onExit();
       };
 
+      if (!roomData || !roomData.game) {
+        return (
+          <div className="min-h-screen flex items-center justify-center text-slate-400">
+            게임 준비 중...
+          </div>
+        );
+      }
+
+      const game = roomData.game;
+      const isHost = roomData.host && roomData.host.uid === user.uid;
+      const gamePlayers = game.players || {};
+      const myGame = gamePlayers[user.uid];
+      const oppUid = Object.keys(gamePlayers).find(uid => uid !== user.uid);
+      const oppGame = oppUid ? gamePlayers[oppUid] : null;
+
+      const myInfo = roomData.players[user.uid];
+      const oppInfo = oppUid ? roomData.players[oppUid] : null;
+
+      const phase = game.phase;
+      const last = game.lastResult;
+
+      let statusText = '';
+      if (phase === 'select') {
+        if (!myGame?.selectedCard) statusText = '카드를 선택하세요';
+        else statusText = '상대가 카드를 선택할 때까지 대기 중...';
+      } else if (phase === 'result' && last) {
+        if (!last.winnerUid) statusText = '무승부!';
+        else if (last.winnerUid === user.uid) statusText = '이 라운드 승리!';
+        else statusText = '이 라운드 패배...';
+      } else if (phase === 'finished') {
+        const myScore = myGame?.score || 0;
+        const oppScore = oppGame?.score || 0;
+        if (myScore > oppScore) statusText = '게임 승리!';
+        else if (myScore < oppScore) statusText = '게임 패배...';
+        else statusText = '무승부로 종료!';
+      }
+
+      const renderCard = (value, selected, disabled, onClick) => (
+        <button
+          key={value}
+          disabled={disabled}
+          onClick={onClick}
+          className={
+            `w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 text-lg sm:text-xl font-bold flex items-center justify-center 
+             transition-transform active:scale-95 mr-1 mb-1
+             ${selected ? 'border-yellow-400 bg-slate-100 text-slate-900' : 'border-slate-600 bg-slate-800 text-white'}
+             ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:border-blue-400'}`
+          }
+        >
+          {value}
+        </button>
+      );
+
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white animate-fade-in">
-          <h1 className="text-5xl font-black text-yellow-400 mb-4 animate-bounce">
-            GAME START!
-          </h1>
-          <p className="text-slate-500 mb-8 text-center">
-            여기부터는 Step 4에서 카드 배틀 로직이 들어갑니다.
-          </p>
-          <button
-            onClick={handleExitGame}
-            className="px-8 py-3 bg-red-600 hover:bg-red-500 rounded-full font-bold"
-          >
-            게임 종료 & 방 나가기
-          </button>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 animate-fade-in">
+          <div className="w-full max-w-3xl glass rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-4">
+            {/* 상단: 상대 정보 & 스코어 */}
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-lg font-bold border border-slate-600">
+                  {oppInfo ? oppInfo.name[0] : '?'}
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500">상대</div>
+                  <div className="font-bold text-white text-sm">{oppInfo?.name ?? '대기 중'}</div>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-slate-500 mb-1">ROUND</div>
+                <div className="text-lg font-bold text-yellow-300">
+                  {game.currentRound} / {game.maxRounds}
+                </div>
+              </div>
+              <div className="flex flex-col items-end text-xs text-slate-400">
+                <div>
+                  {myInfo?.name}: <span className="text-blue-400 font-bold">{myGame?.score ?? 0}</span>
+                </div>
+                <div>
+                  {oppInfo?.name ?? '상대'}: <span className="text-red-400 font-bold">{oppGame?.score ?? 0}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 중앙: 상태 메시지 / 결과 */}
+            <div className="text-center py-2">
+              <p className="font-bold text-lg text-white mb-1">{statusText}</p>
+              {phase === 'result' && last && oppUid && (
+                <div className="text-sm text-slate-400">
+                  {myInfo?.name} [{last[user.uid]}] vs {oppInfo?.name} [{last[oppUid]}]
+                </div>
+              )}
+            </div>
+
+            {/* 중앙: 보드 (내 카드, 상대 카드 노출 등은 심플하게) */}
+            <div className="flex justify-center gap-8 items-center py-2">
+              <div className="flex flex-col items-center">
+                <div className="text-xs text-slate-400 mb-1">상대 카드</div>
+                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-slate-700 bg-slate-800 flex items-center justify-center text-xl font-bold">
+                  {phase === 'result' && last && oppUid ? last[oppUid] : '?'}
+                </div>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="text-xs text-slate-400 mb-1">내 카드</div>
+                <div className="w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 border-blue-400 bg-slate-100 flex items-center justify-center text-xl font-bold text-slate-900">
+                  {myGame?.selectedCard ?? '-'}
+                </div>
+              </div>
+            </div>
+
+            {/* 내 손패 */}
+            <div>
+              <div className="text-xs text-slate-400 mb-1">내 손패</div>
+              <div className="flex flex-wrap">
+                {(myGame?.hand ?? []).map(card =>
+                  renderCard(
+                    card,
+                    myGame?.selectedCard === card,
+                    phase !== 'select',
+                    () => selectCard(card)
+                  )
+                )}
+                {(!myGame?.hand || myGame.hand.length === 0) && (
+                  <div className="text-slate-500 text-sm">손패가 없습니다.</div>
+                )}
+              </div>
+            </div>
+
+            {/* 하단 버튼 */}
+            <div className="flex justify-between items-center pt-2">
+              <button
+                onClick={handleExitGame}
+                className="px-4 py-2 text-xs sm:text-sm text-slate-400 hover:text-white"
+              >
+                게임 종료 & 방 나가기
+              </button>
+
+              {phase === 'result' && (
+                <button
+                  onClick={handleNextRound}
+                  className="px-5 py-2 bg-yellow-500 hover:bg-yellow-400 rounded-xl text-black font-bold text-xs sm:text-sm"
+                >
+                  {game.currentRound >= game.maxRounds ||
+                  (myGame?.hand?.length === 0 || oppGame?.hand?.length === 0)
+                    ? '게임 결과 확정'
+                    : '다음 라운드'}
+                </button>
+              )}
+
+              {phase === 'finished' && (
+                <button
+                  onClick={handleExitGame}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-500 rounded-xl text-white font-bold text-xs sm:text-sm"
+                >
+                  로비로 돌아가기
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       );
     };
