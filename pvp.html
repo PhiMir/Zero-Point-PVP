@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Zero Point: PVP</title>
+  
+  <!-- React & Tailwind -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Firebase Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background-color: #0f172a; color: white; }
+    .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    // ==========================================
+    // 1. Firebase 설정 및 초기화
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAy9neN8_-8HWZNcQluP6jGbzNQMICWc6s",
+      authDomain: "zero-pvp.firebaseapp.com",
+      projectId: "zero-pvp",
+      storageBucket: "zero-pvp.firebasestorage.app",
+      messagingSenderId: "634718710928",
+      appId: "1:634718710928:web:b5339abd5d443c1ca83c15",
+      databaseURL: "https://zero-pvp-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    const { useState, useEffect } = React;
+
+    // ==========================================
+    // 2. 메인 컴포넌트
+    // ==========================================
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [connected, setConnected] = useState(false);
+      const [screen, setScreen] = useState('menu'); // menu -> lobby
+      const [playerName, setPlayerName] = useState('');
+      const [loadingText, setLoadingText] = useState('서버 연결 중...');
+
+      // 초기 연결 및 인증
+      useEffect(() => {
+        // DB 연결 상태 확인
+        const connectedRef = db.ref(".info/connected");
+        connectedRef.on("value", (snap) => {
+          if (snap.val() === true) {
+            setConnected(true);
+            setLoadingText('');
+          } else {
+            setConnected(false);
+            setLoadingText('재연결 시도 중...');
+          }
+        });
+
+        // 익명 로그인 처리
+        const unsubscribe = auth.onAuthStateChanged((u) => {
+          if (u) {
+            console.log("Logged in as:", u.uid);
+            setUser(u);
+          } else {
+            console.log("Attempting anonymous login...");
+            auth.signInAnonymously().catch((error) => {
+              console.error("Login failed:", error);
+              setLoadingText('로그인 실패: ' + error.message);
+            });
+          }
+        });
+
+        return () => {
+          connectedRef.off();
+          unsubscribe();
+        };
+      }, []);
+
+      // 화면 렌더링 분기
+      if (!user) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-gray-400">{loadingText}</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen relative overflow-hidden">
+          {/* 상태 표시줄 */}
+          <div className="absolute top-0 right-0 p-4 flex items-center gap-2 text-xs text-gray-400">
+            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span>{connected ? 'Online' : 'Offline'}</span>
+            <span className="font-mono">ID: {user.uid.slice(0, 6)}</span>
+          </div>
+
+          {screen === 'menu' && (
+            <MenuScreen 
+              onStart={(name) => {
+                setPlayerName(name);
+                setScreen('lobby');
+              }} 
+            />
+          )}
+
+          {screen === 'lobby' && (
+            <LobbyScreen 
+              playerName={playerName} 
+              onBack={() => setScreen('menu')}
+            />
+          )}
+        </div>
+      );
+    };
+
+    // ==========================================
+    // 3. 메뉴 화면 (이름 입력)
+    // ==========================================
+    const MenuScreen = ({ onStart }) => {
+      const [name, setName] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim().length >= 2) {
+          onStart(name.trim());
+        }
+      };
+
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in">
+          <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-purple-600 mb-2">
+            ZERO PVP
+          </h1>
+          <p className="text-gray-400 mb-10">실시간 전략 카드 배틀</p>
+
+          <form onSubmit={handleSubmit} className="w-full max-w-xs flex flex-col gap-4">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="닉네임 입력 (2자 이상)"
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-center text-white focus:border-blue-500 outline-none transition-colors"
+              maxLength={8}
+            />
+            <button 
+              type="submit"
+              disabled={name.trim().length < 2}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all active:scale-95"
+            >
+              접속하기
+            </button>
+          </form>
+        </div>
+      );
+    };
+
+    // ==========================================
+    // 4. 로비 화면 (Step 2에서 구현 예정)
+    // ==========================================
+    const LobbyScreen = ({ playerName, onBack }) => {
+      return (
+        <div className="flex flex-col items-center min-h-screen p-4 animate-fade-in">
+          <header className="w-full max-w-2xl flex justify-between items-center py-4 mb-8 border-b border-gray-800">
+            <button onClick={onBack} className="text-gray-400 hover:text-white">← 뒤로</button>
+            <h2 className="font-bold text-xl">대기실 로비</h2>
+            <div className="w-10"></div> 
+          </header>
+
+          <div className="w-full max-w-md text-center space-y-6">
+            <div className="p-6 bg-gray-800/50 rounded-xl border border-gray-700">
+              <h3 className="text-lg text-gray-300 mb-2">환영합니다!</h3>
+              <p className="text-2xl font-bold text-blue-400">{playerName}</p>
+            </div>
+
+            <div className="p-4 border border-dashed border-gray-700 rounded-xl text-gray-500">
+              <p>Step 2에서 방 목록과</p>
+              <p>방 만들기 기능이 추가됩니다.</p>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
