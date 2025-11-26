@@ -15,21 +15,155 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background-color: #0f172a;
+      font-family: 'Georgia', serif;
+      background: linear-gradient(135deg, #1a3a1a 0%, #0d1f0d 100%);
       color: white;
+      min-height: 100vh;
       -webkit-tap-highlight-color: transparent;
     }
-    .animate-fade-in { animation: fadeIn 0.35s ease-out; }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
+
+    /* 포커 테이블 느낌 */
+    .poker-table {
+      background: radial-gradient(ellipse at center, #1e5631 0%, #143d22 60%, #0d2818 100%);
+      border: 8px solid #5d3a1a;
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.5);
     }
-    .glass {
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(14px);
-      border: 1px solid rgba(148, 163, 184, 0.4);
+
+    .wood-border {
+      background: linear-gradient(180deg, #8b5a2b 0%, #5d3a1a 50%, #3d2510 100%);
+      border: 2px solid #2d1810;
+    }
+
+    /* 포커 카드 스타일 */
+    .poker-card {
+      background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+      border-radius: 8px;
+      box-shadow: 2px 2px 8px rgba(0,0,0,0.3), inset 0 0 20px rgba(255,255,255,0.5);
+      position: relative;
+      font-family: 'Georgia', serif;
+    }
+    .poker-card::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      pointer-events: none;
+    }
+    .poker-card.card-back {
+      background: linear-gradient(145deg, #8b0000 0%, #4a0000 100%);
+      background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(255,255,255,0.05) 10px,
+        rgba(255,255,255,0.05) 20px
+      );
+    }
+    .poker-card.selected {
+      transform: translateY(-8px);
+      box-shadow: 0 12px 20px rgba(0,0,0,0.4), 0 0 20px rgba(255,215,0,0.5);
+      border: 3px solid gold;
+    }
+
+    /* 애니메이션 */
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-slide-up { animation: slideUp 0.3s ease-out; }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-pulse-glow { animation: pulseGlow 1.5s infinite; }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 5px rgba(255,215,0,0.5); }
+      50% { box-shadow: 0 0 20px rgba(255,215,0,0.8), 0 0 30px rgba(255,215,0,0.4); }
+    }
+
+    .animate-shake { animation: shake 0.5s ease-in-out; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    .animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+    @keyframes bounceIn {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+
+    .animate-flash { animation: flash 0.3s ease-out; }
+    @keyframes flash {
+      0% { background-color: rgba(255,255,255,0.8); }
+      100% { background-color: transparent; }
+    }
+
+    /* 스킬 이펙트 */
+    .skill-effect {
+      position: absolute;
+      pointer-events: none;
+      z-index: 100;
+    }
+    .effect-plus { color: #22c55e; font-size: 2rem; font-weight: bold; animation: floatUp 1s forwards; }
+    .effect-minus { color: #ef4444; font-size: 2rem; font-weight: bold; animation: floatUp 1s forwards; }
+    .effect-double { color: #eab308; font-size: 2rem; font-weight: bold; animation: zoomPulse 0.8s forwards; }
+    .effect-random { color: #a855f7; font-size: 2rem; animation: spin 0.8s forwards; }
+    .effect-retrieve { color: #3b82f6; font-size: 2rem; animation: spiral 1s forwards; }
+    .effect-nullify { color: #dc2626; font-size: 2.5rem; animation: stamp 0.6s forwards; }
+
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+    }
+    @keyframes zoomPulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { transform: scale(1.5); }
+      100% { opacity: 0; transform: scale(2); }
+    }
+    @keyframes spin {
+      0% { opacity: 1; transform: rotate(0deg) scale(1); }
+      100% { opacity: 0; transform: rotate(720deg) scale(0); }
+    }
+    @keyframes spiral {
+      0% { opacity: 1; transform: rotate(0deg) translateY(0); }
+      100% { opacity: 0; transform: rotate(360deg) translateY(-30px); }
+    }
+    @keyframes stamp {
+      0% { opacity: 0; transform: scale(3); }
+      50% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+
+    /* 타이머 바 */
+    .timer-bar {
+      height: 4px;
+      background: linear-gradient(90deg, #22c55e 0%, #eab308 50%, #ef4444 100%);
+      transition: width 0.1s linear;
+    }
+
+    /* 스크롤바 */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+
+    /* 스킬 버튼 */
+    .skill-btn {
+      transition: all 0.2s;
+    }
+    .skill-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .skill-btn:active:not(:disabled) {
+      transform: scale(0.95);
     }
   </style>
 </head>
@@ -53,7 +187,7 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // 승부 판단
+    // 승부 판단 (작은 숫자 승리, 10은 0을 이김)
     const getWinnerUid = (uidA, cardA, uidB, cardB) => {
       if (cardA === cardB) return null;
       if (cardA === 10 && cardB === 0) return uidA;
@@ -63,12 +197,14 @@
 
     // 스킬 정의
     const SKILL_DEFS = {
-      'self-plus':  { id: 'self-plus',  name: '본인+1',  color: 'bg-green-600' },
-      'self-minus': { id: 'self-minus', name: '본인-1',  color: 'bg-green-500' },
-      'opp-plus':   { id: 'opp-plus',   name: '상대+1',  color: 'bg-red-600'   },
-      'opp-minus':  { id: 'opp-minus',  name: '상대-1',  color: 'bg-red-500'   },
-      'double':     { id: 'double',     name: '2배',     color: 'bg-yellow-600'},
-      'random':     { id: 'random',     name: '랜덤',    color: 'bg-purple-600'}
+      'self-plus':  { id: 'self-plus',  name: '본인+1',  icon: '+1', color: 'bg-emerald-600', desc: '내 카드 +1 (10→0)' },
+      'self-minus': { id: 'self-minus', name: '본인-1',  icon: '-1', color: 'bg-emerald-500', desc: '내 카드 -1 (0→10)' },
+      'opp-plus':   { id: 'opp-plus',   name: '상대+1',  icon: '+1', color: 'bg-red-600', desc: '상대 카드 +1' },
+      'opp-minus':  { id: 'opp-minus',  name: '상대-1',  icon: '-1', color: 'bg-red-500', desc: '상대 카드 -1' },
+      'double':     { id: 'double',     name: '2배',     icon: 'x2', color: 'bg-yellow-600', desc: '내 카드 x2 (10초과시 일의자리)' },
+      'random':     { id: 'random',     name: '랜덤',    icon: '?',  color: 'bg-purple-600', desc: '내 카드를 0~10 랜덤으로' },
+      'retrieve':   { id: 'retrieve',   name: '회수',    icon: '↩', color: 'bg-blue-600', desc: '이번 턴 카드 회수, 턴 리셋' },
+      'nullify':    { id: 'nullify',    name: '무력화',  icon: '✕', color: 'bg-gray-700', desc: '상대가 사용한 스킬 1개 취소' }
     };
     const SKILL_IDS = Object.keys(SKILL_DEFS);
     const randomSkillId = () => SKILL_IDS[Math.floor(Math.random() * SKILL_IDS.length)];
@@ -91,7 +227,7 @@
           return doubled > 10 ? doubled % 10 : doubled;
         }
         case 'random':
-          return storedRandom;
+          return storedRandom !== undefined ? storedRandom : v;
         default:
           return v;
       }
@@ -119,35 +255,28 @@
 
       if (!user) {
         return (
-          <div className="min-h-screen flex items-center justify-center text-slate-400">
-            서버 연결 중...
+          <div className="min-h-screen flex items-center justify-center text-amber-200">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              서버 연결 중...
+            </div>
           </div>
         );
       }
 
       return (
-        <div className="min-h-screen bg-slate-900 text-white overflow-hidden relative">
+        <div className="min-h-screen">
           {screen === 'menu' && (
-            <MenuScreen
-              onStart={(name) => {
-                setPlayerName(name);
-                setScreen('lobby');
-              }}
-            />
+            <MenuScreen onStart={(name) => { setPlayerName(name); setScreen('lobby'); }} />
           )}
-
           {screen === 'lobby' && (
             <LobbyScreen
               user={user}
               playerName={playerName}
               onBack={() => setScreen('menu')}
-              onJoinRoom={(roomId) => {
-                setCurrentRoomId(roomId);
-                setScreen('room');
-              }}
+              onJoinRoom={(roomId) => { setCurrentRoomId(roomId); setScreen('room'); }}
             />
           )}
-
           {screen === 'room' && (
             <WaitingRoom
               user={user}
@@ -157,13 +286,8 @@
               onLeave={handleExitToLobby}
             />
           )}
-
           {screen === 'game' && (
-            <GameScreen
-              user={user}
-              roomId={currentRoomId}
-              onExit={handleExitToLobby}
-            />
+            <GameScreen user={user} roomId={currentRoomId} onExit={handleExitToLobby} />
           )}
         </div>
       );
@@ -172,38 +296,38 @@
     // ==================== Menu ====================
     const MenuScreen = ({ onStart }) => {
       const [name, setName] = useState('');
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        const trimmed = name.trim();
-        if (trimmed.length >= 2) onStart(trimmed);
-      };
 
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-fade-in">
-          <h1 className="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-3 tracking-tight">
-            ZERO
-          </h1>
-          <p className="text-slate-400 mb-10 text-xs tracking-[0.35em] uppercase">
-            Point PvP
-          </p>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 animate-fade-in">
+          <div className="text-center mb-10">
+            <h1 className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-yellow-500 to-amber-700 mb-2" style={{textShadow: '0 4px 8px rgba(0,0,0,0.5)'}}>
+              ZERO
+            </h1>
+            <p className="text-amber-200/80 text-lg tracking-[0.5em] uppercase">Point PvP</p>
+          </div>
 
-          <form onSubmit={handleSubmit} className="w-full max-w-xs glass p-6 rounded-2xl flex flex-col gap-4">
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="닉네임 (2~8자)"
-              maxLength={8}
-              className="w-full px-4 py-3 bg-slate-800 rounded-xl text-center text-white outline-none border border-slate-700 focus:border-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={name.trim().length < 2}
-              className="w-full py-3 bg-blue-600 rounded-xl font-bold disabled:opacity-50"
-            >
-              ENTER LOBBY
-            </button>
-          </form>
+          <div className="wood-border rounded-2xl p-1">
+            <div className="poker-table rounded-xl p-8 w-80">
+              <div className="text-center mb-6">
+                <p className="text-amber-200/60 text-sm mb-2">닉네임 입력</p>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="2~8자"
+                  maxLength={8}
+                  className="w-full px-4 py-3 bg-black/30 rounded-lg text-center text-white text-xl outline-none border-2 border-amber-900/50 focus:border-amber-500 transition-colors"
+                />
+              </div>
+              <button
+                onClick={() => name.trim().length >= 2 && onStart(name.trim())}
+                disabled={name.trim().length < 2}
+                className="w-full py-4 bg-gradient-to-b from-amber-500 to-amber-700 rounded-lg font-bold text-lg text-white shadow-lg disabled:opacity-40 disabled:cursor-not-allowed hover:from-amber-400 hover:to-amber-600 transition-all active:scale-95"
+              >
+                게임 입장
+              </button>
+            </div>
+          </div>
         </div>
       );
     };
@@ -235,102 +359,72 @@
           list.sort((a, b) => b.createdAt - a.createdAt);
           setRooms(list);
         });
-
         return () => roomsRef.off('value', listener);
       }, []);
 
       const createRoom = async () => {
         const roomRef = db.ref('rooms').push();
-        const roomId = roomRef.key;
-
         await roomRef.set({
           status: 'waiting',
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          host: { uid: user.uid, name: playerName }
+          host: { uid: user.uid, name: playerName },
+          settings: { maxRounds: 3 }
         });
-
-        const playerRef = roomRef.child(`players/${user.uid}`);
-        await playerRef.set({ name: playerName, ready: false });
-        playerRef.onDisconnect().remove();
-
-        onJoinRoom(roomId);
+        await roomRef.child(`players/${user.uid}`).set({ name: playerName, ready: false });
+        roomRef.child(`players/${user.uid}`).onDisconnect().remove();
+        onJoinRoom(roomRef.key);
       };
 
       const joinRoom = async (roomId) => {
         const roomRef = db.ref(`rooms/${roomId}`);
         const snap = await roomRef.get();
-
-        if (!snap.exists()) {
-          alert("존재하지 않는 방입니다.");
-          return;
-        }
-
+        if (!snap.exists()) return alert("존재하지 않는 방입니다.");
         const room = snap.val();
-        if (!room.players) {
-          alert("플레이어 정보가 없는 방입니다.");
-          return;
-        }
-        if (Object.keys(room.players).length >= 2) {
-          alert("이미 2명이 가득 찼습니다.");
-          return;
-        }
+        if (Object.keys(room.players || {}).length >= 2) return alert("방이 가득 찼습니다.");
 
-        const playerRef = roomRef.child(`players/${user.uid}`);
-        await playerRef.set({ name: playerName, ready: false });
-        playerRef.onDisconnect().remove();
-
+        await roomRef.child(`players/${user.uid}`).set({ name: playerName, ready: false });
+        roomRef.child(`players/${user.uid}`).onDisconnect().remove();
         onJoinRoom(roomId);
       };
 
       return (
-        <div className="min-h-screen p-4 max-w-2xl mx-auto animate-fade-in">
-          <header className="flex justify-between items-center py-6">
-            <button onClick={onBack} className="text-slate-400 hover:text-white">← EXIT</button>
-            <h2 className="font-bold text-xl tracking-[0.3em] uppercase text-slate-100">Lobby</h2>
-            <div className="w-10"></div>
-          </header>
+        <div className="min-h-screen p-4 animate-fade-in">
+          <div className="max-w-2xl mx-auto">
+            <header className="flex justify-between items-center py-4 mb-6">
+              <button onClick={onBack} className="text-amber-200/60 hover:text-amber-200">← 나가기</button>
+              <h2 className="text-2xl font-bold text-amber-200">LOBBY</h2>
+              <div className="w-16"></div>
+            </header>
 
-          <div className="glass p-6 rounded-2xl mb-6 flex justify-between items-center">
-            <div>
-              <p className="text-xs text-slate-400">PLAYER</p>
-              <p className="font-bold text-blue-400 text-lg">{playerName}</p>
-            </div>
-            <button
-              onClick={createRoom}
-              className="bg-blue-600 px-6 py-3 rounded-xl font-bold active:scale-95 transition-transform"
-            >
-              + CREATE ROOM
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {rooms.length === 0 ? (
-              <div className="text-center py-10 text-slate-500">
-                대기 중인 방이 없습니다.
-              </div>
-            ) : (
-              rooms.map(room => (
-                <div
-                  key={room.id}
-                  className="bg-slate-800/90 p-5 rounded-xl flex justify-between items-center border border-slate-700"
-                >
-                  <div>
-                    <div className="font-bold text-lg text-white">
-                      {room.host.name}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      #{room.id.slice(-4)} · {Object.keys(room.players || {}).length}/2
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => joinRoom(room.id)}
-                    className="bg-slate-700 hover:bg-green-600 px-6 py-2 rounded-lg font-bold text-white transition-colors"
-                  >
-                    JOIN
-                  </button>
+            <div className="wood-border rounded-2xl p-1 mb-6">
+              <div className="poker-table rounded-xl p-6 flex justify-between items-center">
+                <div>
+                  <p className="text-amber-200/60 text-xs">PLAYER</p>
+                  <p className="text-xl font-bold text-amber-200">{playerName}</p>
                 </div>
-              ))
-            )}
+                <button onClick={createRoom} className="px-6 py-3 bg-gradient-to-b from-amber-500 to-amber-700 rounded-lg font-bold text-white hover:from-amber-400 hover:to-amber-600 active:scale-95 transition-all">
+                  + 방 만들기
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {rooms.length === 0 ? (
+                <div className="text-center py-10 text-amber-200/40">대기 중인 방이 없습니다.</div>
+              ) : rooms.map(room => (
+                <div key={room.id} className="wood-border rounded-xl p-1">
+                  <div className="poker-table rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-amber-200">{room.host.name}의 방</p>
+                      <p className="text-xs text-amber-200/50">#{room.id.slice(-4)} · {room.settings?.maxRounds || 3}라운드</p>
+                    </div>
+                    <button onClick={() => joinRoom(room.id)} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold text-white transition-colors">
+                      입장
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       );
@@ -339,223 +433,173 @@
     // ==================== Waiting Room ====================
     const WaitingRoom = ({ user, playerName, roomId, onLeave, onGameStart }) => {
       const [roomData, setRoomData] = useState(null);
+      const [selectedRounds, setSelectedRounds] = useState(3);
 
       useEffect(() => {
         const roomRef = db.ref(`rooms/${roomId}`);
-
         const listener = roomRef.on('value', (snapshot) => {
           const data = snapshot.val();
-          if (!data) {
-            alert("방이 종료되었습니다.");
-            onLeave();
-            return;
-          }
+          if (!data) { alert("방이 종료되었습니다."); onLeave(); return; }
           setRoomData(data);
-
-          if (data.status === 'playing') {
-            onGameStart();
-          }
+          if (data.settings?.maxRounds) setSelectedRounds(data.settings.maxRounds);
+          if (data.status === 'playing') onGameStart();
         });
-
-        return () => {
-          roomRef.off('value', listener);
-        };
+        return () => roomRef.off('value', listener);
       }, [roomId, onLeave, onGameStart]);
 
       const handleLeave = async () => {
-        if (!roomData) {
-          onLeave();
-          return;
-        }
-        const roomRef = db.ref(`rooms/${roomId}`);
-        const isHost = roomData.host && roomData.host.uid === user.uid;
-
-        if (isHost) {
-          await roomRef.remove();
-        } else {
-          await roomRef.child(`players/${user.uid}`).remove();
-        }
+        if (!roomData) { onLeave(); return; }
+        const isHost = roomData.host?.uid === user.uid;
+        if (isHost) await db.ref(`rooms/${roomId}`).remove();
+        else await db.ref(`rooms/${roomId}/players/${user.uid}`).remove();
         onLeave();
       };
 
       const toggleReady = async () => {
-        if (!roomData || !roomData.players || !roomData.players[user.uid]) return;
-        const myReady = !!roomData.players[user.uid].ready;
-        await db.ref(`rooms/${roomId}/players/${user.uid}/ready`).set(!myReady);
+        if (!roomData?.players?.[user.uid]) return;
+        await db.ref(`rooms/${roomId}/players/${user.uid}/ready`).set(!roomData.players[user.uid].ready);
+      };
+
+      const updateRounds = async (rounds) => {
+        setSelectedRounds(rounds);
+        await db.ref(`rooms/${roomId}/settings/maxRounds`).set(rounds);
       };
 
       const startGame = async () => {
-        if (!roomData) return;
-        const roomRef = db.ref(`rooms/${roomId}`);
-        await roomRef.update({
+        await db.ref(`rooms/${roomId}`).update({
           status: 'playing',
           startedAt: firebase.database.ServerValue.TIMESTAMP
         });
       };
 
-      if (!roomData || !roomData.players || !roomData.players[user.uid]) {
-        return (
-          <div className="min-h-screen flex items-center justify-center text-slate-400">
-            방 정보 불러오는 중...
-          </div>
-        );
+      if (!roomData?.players?.[user.uid]) {
+        return <div className="min-h-screen flex items-center justify-center text-amber-200">로딩 중...</div>;
       }
 
       const me = roomData.players[user.uid];
-      const isHost = roomData.host && roomData.host.uid === user.uid;
+      const isHost = roomData.host?.uid === user.uid;
       const players = Object.entries(roomData.players);
       const opponentEntry = players.find(([uid]) => uid !== user.uid);
       const opponent = opponentEntry ? opponentEntry[1] : null;
-
-      const amIReady = !!me.ready;
-      const oppReady = opponent ? !!opponent.ready : false;
-      const canStart = opponent && amIReady && oppReady;
+      const canStart = opponent && me.ready && opponent.ready;
 
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 animate-fade-in">
-          <div className="w-full max-w-lg glass rounded-3xl p-8 shadow-2xl">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white">WAITING ROOM</h2>
-              <div className="flex justify-center gap-2 mt-2">
-                <span className="text-xs px-2 py-1 bg-slate-800 rounded text-slate-400">
-                  Room ID: {roomId.slice(-4)}
-                </span>
-                {isHost && (
-                  <span className="text-xs px-2 py-1 bg-yellow-900 text-yellow-200 rounded font-bold">
-                    HOST
-                  </span>
-                )}
-              </div>
-            </div>
+        <div className="min-h-screen flex items-center justify-center p-4 animate-fade-in">
+          <div className="wood-border rounded-3xl p-2 w-full max-w-lg">
+            <div className="poker-table rounded-2xl p-8">
+              <h2 className="text-2xl font-bold text-amber-200 text-center mb-2">대기실</h2>
+              <p className="text-center text-amber-200/50 text-xs mb-8">Room #{roomId.slice(-4)}</p>
 
-            <div className="flex justify-between items-center mb-12">
-              <div className="flex-1 flex flex-col items-center">
-                <div
-                  className={`w-20 h-20 rounded-full mb-3 flex items-center justify-center text-2xl font-black border-4 ${
-                    amIReady ? 'border-green-500 bg-green-900/30 text-green-400' : 'border-blue-500 bg-slate-800'
-                  }`}
-                >
-                  {me.name[0]}
+              {/* 라운드 선택 (방장만) */}
+              {isHost && (
+                <div className="mb-6 text-center">
+                  <p className="text-amber-200/60 text-sm mb-2">라운드 수</p>
+                  <div className="flex justify-center gap-2">
+                    {[3, 4, 5].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => updateRounds(n)}
+                        className={`w-12 h-12 rounded-lg font-bold text-lg transition-all ${
+                          selectedRounds === n
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-black/30 text-amber-200/60 hover:bg-black/50'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <span className="font-bold text-white mb-1">{me.name}</span>
-                <span
-                  className={`text-xs px-2 py-1 rounded font-bold ${
-                    amIReady ? 'bg-green-600' : 'bg-slate-700 text-slate-400'
-                  }`}
-                >
-                  {amIReady ? 'READY' : 'WAITING'}
-                </span>
-              </div>
+              )}
+              {!isHost && (
+                <p className="text-center text-amber-200/60 mb-6">{selectedRounds}라운드 게임</p>
+              )}
 
-              <div className="text-2xl font-black text-slate-700 italic">VS</div>
-
-              <div className="flex-1 flex flex-col items-center">
+              {/* 플레이어 표시 */}
+              <div className="flex justify-between items-center mb-8">
+                <PlayerSlot player={me} isReady={me.ready} label="나" />
+                <span className="text-3xl font-black text-amber-900/50 italic">VS</span>
                 {opponent ? (
-                  <>
-                    <div
-                      className={`w-20 h-20 rounded-full mb-3 flex items-center justify-center text-2xl font-black border-4 ${
-                        oppReady ? 'border-green-500 bg-green-900/30 text-green-400' : 'border-red-500 bg-slate-800'
-                      }`}
-                    >
-                      {opponent.name[0]}
-                    </div>
-                    <span className="font-bold text-white mb-1">{opponent.name}</span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded font-bold ${
-                        oppReady ? 'bg-green-600' : 'bg-slate-700 text-slate-400'
-                      }`}
-                    >
-                      {oppReady ? 'READY' : 'WAITING'}
-                    </span>
-                  </>
+                  <PlayerSlot player={opponent} isReady={opponent.ready} label="" />
                 ) : (
-                  <>
-                    <div className="w-20 h-20 rounded-full mb-3 flex items-center justify-center bg-slate-800 border-4 border-dashed border-slate-700 animate-pulse">
-                      ?
-                    </div>
-                    <span className="text-slate-500 text-sm">상대 기다리는 중...</span>
-                  </>
+                  <div className="flex flex-col items-center">
+                    <div className="w-20 h-20 rounded-full bg-black/30 border-4 border-dashed border-amber-900/50 flex items-center justify-center animate-pulse text-3xl text-amber-900/50">?</div>
+                    <span className="text-amber-200/50 text-sm mt-2">대기 중...</span>
+                  </div>
                 )}
               </div>
-            </div>
 
-            <div className="space-y-3">
-              {isHost ? (
-                <>
+              {/* 버튼 */}
+              <div className="space-y-3">
+                {isHost ? (
                   <button
                     onClick={startGame}
                     disabled={!canStart}
-                    className={`w-full py-4 rounded-xl font-black text-lg transition-all shadow-lg ${
-                      canStart
-                        ? 'bg-green-600 hover:bg-green-500 text-white animate-pulse'
-                        : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    className={`w-full py-4 rounded-xl font-black text-lg transition-all ${
+                      canStart ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 text-white animate-pulse-glow hover:from-emerald-400' : 'bg-black/30 text-amber-200/40 cursor-not-allowed'
                     }`}
                   >
-                    {opponent ? (canStart ? 'START GAME 🚀' : '둘 다 READY 필요') : '상대 대기 중'}
+                    {canStart ? '게임 시작!' : '모두 준비 필요'}
                   </button>
-                  <button
-                    onClick={toggleReady}
-                    className={`w-full py-3 rounded-xl font-bold text-sm transition-colors ${
-                      amIReady ? 'bg-slate-700 text-slate-400' : 'bg-blue-600 text-white'
-                    }`}
-                  >
-                    {amIReady ? '준비 취소' : '방장 READY'}
-                  </button>
-                </>
-              ) : (
+                ) : null}
                 <button
                   onClick={toggleReady}
-                  className={`w-full py-4 rounded-xl font-black text-lg transition-all shadow-lg active:scale-95 ${
-                    amIReady ? 'bg-slate-700 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-500'
+                  className={`w-full py-3 rounded-xl font-bold transition-all ${
+                    me.ready ? 'bg-gray-600 text-gray-300' : 'bg-blue-600 text-white hover:bg-blue-500'
                   }`}
                 >
-                  {amIReady ? '준비 취소' : 'READY!'}
+                  {me.ready ? '준비 취소' : '준비 완료'}
                 </button>
-              )}
-
-              <button
-                onClick={handleLeave}
-                className="w-full py-3 text-slate-500 hover:text-white text-sm"
-              >
-                방 나가기
-              </button>
+                <button onClick={handleLeave} className="w-full py-2 text-amber-200/50 hover:text-amber-200 text-sm">
+                  나가기
+                </button>
+              </div>
             </div>
           </div>
         </div>
       );
     };
 
+    const PlayerSlot = ({ player, isReady, label }) => (
+      <div className="flex flex-col items-center">
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-2xl font-black border-4 transition-all ${
+          isReady ? 'border-emerald-500 bg-emerald-900/50 text-emerald-400' : 'border-amber-600 bg-black/30 text-amber-200'
+        }`}>
+          {player.name[0]}
+        </div>
+        <span className="text-amber-200 font-bold mt-2">{player.name}{label ? ` ${label}` : ''}</span>
+        <span className={`text-xs px-2 py-1 rounded mt-1 ${isReady ? 'bg-emerald-600 text-white' : 'bg-black/30 text-amber-200/50'}`}>
+          {isReady ? 'READY' : 'WAITING'}
+        </span>
+      </div>
+    );
+
     // ==================== Game Screen ====================
     const GameScreen = ({ user, roomId, onExit }) => {
       const [roomData, setRoomData] = useState(null);
       const [isInitializing, setIsInitializing] = useState(false);
+      const [timer, setTimer] = useState(10);
+      const [effects, setEffects] = useState([]);
+      const [nullifyTarget, setNullifyTarget] = useState(null);
       const onExitRef = useRef(onExit);
-      
-      // ref 업데이트
-      useEffect(() => {
-        onExitRef.current = onExit;
-      }, [onExit]);
+      const timerRef = useRef(null);
+
+      useEffect(() => { onExitRef.current = onExit; }, [onExit]);
 
       // 실시간 구독
       useEffect(() => {
         const roomRef = db.ref(`rooms/${roomId}`);
-
         const listener = roomRef.on('value', (snapshot) => {
           const data = snapshot.val();
-          if (!data) {
-            alert("방이 종료되었습니다.");
-            onExitRef.current();
-            return;
-          }
+          if (!data) { alert("방이 종료되었습니다."); onExitRef.current(); return; }
           setRoomData(data);
         });
-
         return () => roomRef.off('value', listener);
       }, [roomId]);
 
       // 호스트: 게임 초기화
       useEffect(() => {
-        if (!roomData || !roomData.host || !roomData.players) return;
+        if (!roomData?.host || !roomData?.players) return;
         if (roomData.host.uid !== user.uid) return;
         if (roomData.game) return;
         if (isInitializing) return;
@@ -568,23 +612,23 @@
               score: 0,
               hand: [0,1,2,3,4,5,6,7,8,9,10],
               selectedCard: null,
+              originalCard: null,
               effectiveCard: null,
-              skills: [randomSkillId(), randomSkillId()]
+              skills: [randomSkillId(), randomSkillId()],
+              ready: false
             };
           });
-          
           await db.ref(`rooms/${roomId}/game`).set({
-            maxRounds: 5,
+            maxRounds: roomData.settings?.maxRounds || 3,
             currentRound: 1,
+            currentTurn: 1,
             phase: 'select',
             lastResult: null,
-            skillLog: null,
-            skillRequests: null,
+            skillLog: [],
             players: gamePlayers
           });
           setIsInitializing(false);
         };
-
         initGame();
       }, [roomData, roomId, user.uid, isInitializing]);
 
@@ -596,124 +640,219 @@
 
         const entries = Object.entries(roomData.game.players || {});
         if (entries.length < 2) return;
-        
-        const allSelected = entries.every(([uid, p]) =>
-          p.selectedCard !== null && p.selectedCard !== undefined
-        );
+        const allSelected = entries.every(([uid, p]) => p.selectedCard !== null && p.selectedCard !== undefined);
         if (!allSelected) return;
 
         const basePath = `rooms/${roomId}/game`;
         const updates = {};
         entries.forEach(([uid, p]) => {
           updates[`${basePath}/players/${uid}/effectiveCard`] = p.selectedCard;
+          updates[`${basePath}/players/${uid}/originalCard`] = p.selectedCard;
         });
         updates[`${basePath}/phase`] = 'skill';
-        updates[`${basePath}/lastResult`] = null;
-        updates[`${basePath}/skillRequests`] = null;
+        updates[`${basePath}/skillLog`] = [];
+        updates[`${basePath}/skillPhaseStart`] = firebase.database.ServerValue.TIMESTAMP;
 
         db.ref().update(updates);
       }, [roomData, roomId, user.uid]);
 
-      // 호스트: skillRequests 처리
+      // 스킬 페이즈 타이머
       useEffect(() => {
-        if (!roomData?.game || !roomData?.host) return;
-        if (roomData.host.uid !== user.uid) return;
-        if (roomData.game.phase !== 'skill') return;
-        if (!roomData.game.skillRequests) return;
-
-        const entriesReq = Object.entries(roomData.game.skillRequests);
-        if (entriesReq.length === 0) return;
-
-        const basePath = `rooms/${roomId}/game`;
-        const sorted = entriesReq.sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
-
-        const localGame = JSON.parse(JSON.stringify(roomData.game));
-        const updates = {};
-        const logArr = Array.isArray(localGame.skillLog) ? [...localGame.skillLog] : [];
-
-        for (const [reqId, req] of sorted) {
-          const { uid, skillId } = req;
-          const player = localGame.players[uid];
-          if (!player) continue;
-
-          const skillsArr = player.skills || [];
-          const idx = skillsArr.indexOf(skillId);
-          if (idx === -1) continue;
-
-          let targetUid = uid;
-          if (skillId.startsWith('opp-')) {
-            targetUid = Object.keys(localGame.players).find(x => x !== uid) || uid;
-          }
-
-          const targetPlayer = localGame.players[targetUid];
-          if (!targetPlayer) continue;
-
-          let beforeVal = targetPlayer.effectiveCard ?? targetPlayer.selectedCard;
-          if (beforeVal === null || beforeVal === undefined) continue;
-
-          let storedRandom = undefined;
-          if (skillId === 'random') {
-            storedRandom = Math.floor(Math.random() * 11);
-          }
-
-          const afterVal = applySkillValue(beforeVal, skillId, storedRandom);
-
-          const newSkills = [...skillsArr];
-          newSkills.splice(idx, 1);
-          localGame.players[uid].skills = newSkills;
-          updates[`${basePath}/players/${uid}/skills`] = newSkills;
-
-          localGame.players[targetUid].effectiveCard = afterVal;
-          updates[`${basePath}/players/${targetUid}/effectiveCard`] = afterVal;
-
-          logArr.push({
-            id: reqId,
-            byUid: uid,
-            skillId,
-            targetUid,
-            beforeVal,
-            afterVal,
-            storedRandom: storedRandom ?? null,
-            createdAt: req.createdAt || null
-          });
+        if (!roomData?.game || roomData.game.phase !== 'skill') {
+          setTimer(10);
+          if (timerRef.current) clearInterval(timerRef.current);
+          return;
         }
 
-        updates[`${basePath}/skillLog`] = logArr;
-        updates[`${basePath}/skillRequests`] = null;
+        setTimer(10);
+        timerRef.current = setInterval(() => {
+          setTimer(prev => {
+            if (prev <= 1) {
+              clearInterval(timerRef.current);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
 
-        db.ref().update(updates);
-      }, [roomData, roomId, user.uid]);
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+      }, [roomData?.game?.phase, roomData?.game?.currentTurn]);
+
+      // 타이머 종료 시 자동 결과 확정 (호스트만)
+      useEffect(() => {
+        if (timer === 0 && roomData?.game?.phase === 'skill' && roomData?.host?.uid === user.uid) {
+          resolveRound();
+        }
+      }, [timer]);
+
+      // 이펙트 추가 함수
+      const addEffect = (type, targetUid) => {
+        const id = Date.now();
+        setEffects(prev => [...prev, { id, type, targetUid }]);
+        setTimeout(() => setEffects(prev => prev.filter(e => e.id !== id)), 1000);
+      };
 
       // 카드 선택
       const selectCard = async (card) => {
         if (!roomData?.game || roomData.game.phase !== 'select') return;
         const myGame = roomData.game.players?.[user.uid];
         if (!myGame || !myGame.hand?.includes(card)) return;
-
         await db.ref(`rooms/${roomId}/game/players/${user.uid}/selectedCard`).set(card);
       };
 
       // 스킬 사용
-      const useSkill = async (skillId) => {
+      const useSkill = async (skillId, skillIndex) => {
         if (!roomData?.game || roomData.game.phase !== 'skill') return;
         const myGame = roomData.game.players?.[user.uid];
-        if (!myGame || !myGame.skills?.includes(skillId)) return;
+        if (!myGame || !myGame.skills?.[skillIndex]) return;
+        if (timer <= 0) return;
 
-        const reqRef = db.ref(`rooms/${roomId}/game/skillRequests`).push();
-        await reqRef.set({
-          uid: user.uid,
+        const isHost = roomData.host.uid === user.uid;
+        const basePath = `rooms/${roomId}/game`;
+        const oppUid = Object.keys(roomData.game.players).find(uid => uid !== user.uid);
+
+        // 회수 스킬
+        if (skillId === 'retrieve') {
+          addEffect('retrieve', user.uid);
+          const updates = {};
+          Object.keys(roomData.game.players).forEach(uid => {
+            const p = roomData.game.players[uid];
+            updates[`${basePath}/players/${uid}/selectedCard`] = null;
+            updates[`${basePath}/players/${uid}/effectiveCard`] = null;
+            updates[`${basePath}/players/${uid}/originalCard`] = null;
+          });
+          updates[`${basePath}/phase`] = 'select';
+          updates[`${basePath}/skillLog`] = [...(roomData.game.skillLog || []), {
+            id: Date.now(),
+            byUid: user.uid,
+            byName: roomData.players[user.uid].name,
+            skillId: 'retrieve',
+            desc: `${roomData.players[user.uid].name}이(가) 회수를 사용하여 턴을 리셋했습니다.`
+          }];
+
+          // 스킬 소비
+          const newSkills = [...myGame.skills];
+          newSkills.splice(skillIndex, 1);
+          updates[`${basePath}/players/${user.uid}/skills`] = newSkills;
+
+          await db.ref().update(updates);
+          return;
+        }
+
+        // 무력화 스킬 - 타겟 선택 모드
+        if (skillId === 'nullify') {
+          const oppLogs = (roomData.game.skillLog || []).filter(
+            log => log.byUid === oppUid && !log.nullified && log.skillId !== 'retrieve' && log.skillId !== 'nullify'
+          );
+          if (oppLogs.length === 0) {
+            alert('무력화할 상대 스킬이 없습니다.');
+            return;
+          }
+          setNullifyTarget({ skillIndex, oppLogs });
+          return;
+        }
+
+        // 일반 스킬
+        let targetUid = user.uid;
+        if (skillId.startsWith('opp-')) targetUid = oppUid;
+
+        const targetPlayer = roomData.game.players[targetUid];
+        if (!targetPlayer) return;
+
+        const beforeVal = targetPlayer.effectiveCard ?? targetPlayer.selectedCard;
+        if (beforeVal === null) return;
+
+        let storedRandom = undefined;
+        if (skillId === 'random') storedRandom = Math.floor(Math.random() * 11);
+
+        const afterVal = applySkillValue(beforeVal, skillId, storedRandom);
+
+        addEffect(skillId, targetUid);
+
+        const updates = {};
+        updates[`${basePath}/players/${targetUid}/effectiveCard`] = afterVal;
+
+        const newSkills = [...myGame.skills];
+        newSkills.splice(skillIndex, 1);
+        updates[`${basePath}/players/${user.uid}/skills`] = newSkills;
+
+        const logEntry = {
+          id: Date.now(),
+          byUid: user.uid,
+          byName: roomData.players[user.uid].name,
           skillId,
-          createdAt: firebase.database.ServerValue.TIMESTAMP
-        });
+          targetUid,
+          beforeVal,
+          afterVal,
+          storedRandom,
+          nullified: false
+        };
+        updates[`${basePath}/skillLog`] = [...(roomData.game.skillLog || []), logEntry];
+
+        await db.ref().update(updates);
       };
 
-      // 결과 확정 (호스트)
-      const resolveRound = async () => {
+      // 무력화 실행
+      const executeNullify = async (targetLog) => {
+        if (!nullifyTarget) return;
+        const { skillIndex } = nullifyTarget;
+        const myGame = roomData.game.players[user.uid];
+        const basePath = `rooms/${roomId}/game`;
+
+        addEffect('nullify', targetLog.targetUid);
+
+        // 효과 되돌리기
+        const targetPlayer = roomData.game.players[targetLog.targetUid];
+        const updates = {};
+        updates[`${basePath}/players/${targetLog.targetUid}/effectiveCard`] = targetLog.beforeVal;
+
+        // 로그 업데이트 (nullified 표시)
+        const newLog = (roomData.game.skillLog || []).map(log =>
+          log.id === targetLog.id ? { ...log, nullified: true } : log
+        );
+        newLog.push({
+          id: Date.now(),
+          byUid: user.uid,
+          byName: roomData.players[user.uid].name,
+          skillId: 'nullify',
+          targetLogId: targetLog.id,
+          desc: `${roomData.players[user.uid].name}이(가) ${targetLog.byName}의 ${SKILL_DEFS[targetLog.skillId]?.name}을(를) 무력화했습니다.`
+        });
+        updates[`${basePath}/skillLog`] = newLog;
+
+        // 스킬 소비
+        const newSkills = [...myGame.skills];
+        newSkills.splice(skillIndex, 1);
+        updates[`${basePath}/players/${user.uid}/skills`] = newSkills;
+
+        await db.ref().update(updates);
+        setNullifyTarget(null);
+      };
+
+      // 다음 턴 준비 완료
+      const setReady = async () => {
+        await db.ref(`rooms/${roomId}/game/players/${user.uid}/ready`).set(true);
+      };
+
+      // 호스트: 양측 준비 → 다음 턴
+      useEffect(() => {
         if (!roomData?.game || !roomData?.host) return;
         if (roomData.host.uid !== user.uid) return;
-        if (roomData.game.phase !== 'skill') return;
+        if (roomData.game.phase !== 'result') return;
 
+        const entries = Object.entries(roomData.game.players || {});
+        const allReady = entries.every(([uid, p]) => p.ready);
+        if (!allReady) return;
+
+        nextTurn();
+      }, [roomData]);
+
+      // 결과 확정
+      const resolveRound = async () => {
+        if (!roomData?.game) return;
         const g = roomData.game;
+        if (g.phase !== 'skill') return;
+
         const entries = Object.entries(g.players || {});
         if (entries.length < 2) return;
 
@@ -723,87 +862,93 @@
 
         const effA = pA.effectiveCard ?? pA.selectedCard;
         const effB = pB.effectiveCard ?? pB.selectedCard;
-        if (effA === null || effA === undefined || effB === null || effB === undefined) return;
+        if (effA === null || effB === null) return;
 
         const winnerUid = getWinnerUid(uidA, effA, uidB, effB);
-
         const updates = {};
-        
+
+        // 점수
         if (winnerUid) {
-          const currentScore = g.players[winnerUid].score || 0;
-          updates[`${basePath}/players/${winnerUid}/score`] = currentScore + 1;
+          updates[`${basePath}/players/${winnerUid}/score`] = (g.players[winnerUid].score || 0) + 1;
         }
 
-        const newHandA = (pA.hand || []).filter(c => c !== pA.selectedCard);
-        const newHandB = (pB.hand || []).filter(c => c !== pB.selectedCard);
-        updates[`${basePath}/players/${uidA}/hand`] = newHandA;
-        updates[`${basePath}/players/${uidB}/hand`] = newHandB;
+        // 사용한 카드 제거
+        updates[`${basePath}/players/${uidA}/hand`] = (pA.hand || []).filter(c => c !== pA.selectedCard);
+        updates[`${basePath}/players/${uidB}/hand`] = (pB.hand || []).filter(c => c !== pB.selectedCard);
 
-        updates[`${basePath}/players/${uidA}/selectedCard`] = null;
-        updates[`${basePath}/players/${uidB}/selectedCard`] = null;
-        updates[`${basePath}/players/${uidA}/effectiveCard`] = null;
-        updates[`${basePath}/players/${uidB}/effectiveCard`] = null;
-
+        // 스킬 지급
         const giveSkill = (uid, count) => {
-          if (!uid || count <= 0) return;
-          const curSkills = Array.isArray(g.players[uid].skills) ? g.players[uid].skills : [];
-          const newSkills = [...curSkills];
-          for (let i = 0; i < count; i++) newSkills.push(randomSkillId());
-          updates[`${basePath}/players/${uid}/skills`] = newSkills;
+          const cur = Array.isArray(g.players[uid].skills) ? [...g.players[uid].skills] : [];
+          for (let i = 0; i < count; i++) cur.push(randomSkillId());
+          updates[`${basePath}/players/${uid}/skills`] = cur;
         };
 
         const isTenVsZero = (effA === 10 && effB === 0) || (effA === 0 && effB === 10);
         const diff = Math.abs(effA - effB);
 
         if (winnerUid) {
-          if (isTenVsZero) {
-            giveSkill(winnerUid, 2);
-          } else if (diff === 1) {
-            giveSkill(winnerUid, 1);
-          }
+          if (isTenVsZero) giveSkill(winnerUid, 2);
+          else if (diff === 1) giveSkill(winnerUid, 1);
         } else {
           giveSkill(uidA, 1);
           giveSkill(uidB, 1);
         }
 
-        const lastResult = {
+        // 결과 저장
+        updates[`${basePath}/lastResult`] = {
           [uidA]: { selected: pA.selectedCard, effective: effA },
           [uidB]: { selected: pB.selectedCard, effective: effB },
           winnerUid,
-          round: g.currentRound
+          turn: g.currentTurn
         };
-        updates[`${basePath}/lastResult`] = lastResult;
         updates[`${basePath}/phase`] = 'result';
+        updates[`${basePath}/players/${uidA}/ready`] = false;
+        updates[`${basePath}/players/${uidB}/ready`] = false;
 
         await db.ref().update(updates);
       };
 
-      // 다음 라운드 (호스트)
-      const nextRoundOrFinish = async () => {
-        if (!roomData?.game || !roomData?.host) return;
-        if (roomData.host.uid !== user.uid) return;
-        if (roomData.game.phase !== 'result') return;
-
+      // 다음 턴/라운드
+      const nextTurn = async () => {
+        if (!roomData?.game) return;
         const g = roomData.game;
         const basePath = `rooms/${roomId}/game`;
         const entries = Object.entries(g.players || {});
-        if (entries.length < 2) return;
-
         const [uidA, pA] = entries[0];
         const [uidB, pB] = entries[1];
 
-        const handsEmpty = (pA.hand?.length || 0) === 0 || (pB.hand?.length || 0) === 0;
-        const isLastRound = g.currentRound >= g.maxRounds;
-
-        if (handsEmpty || isLastRound) {
-          await db.ref(basePath).update({ phase: 'finished' });
-          return;
-        }
-
         const updates = {};
-        updates[`${basePath}/currentRound`] = g.currentRound + 1;
-        updates[`${basePath}/phase`] = 'select';
-        updates[`${basePath}/lastResult`] = null;
+
+        // 손패가 비었으면 라운드 종료
+        const handsEmpty = (pA.hand?.length || 0) === 0 || (pB.hand?.length || 0) === 0;
+
+        if (handsEmpty) {
+          if (g.currentRound >= g.maxRounds) {
+            updates[`${basePath}/phase`] = 'finished';
+          } else {
+            // 다음 라운드
+            updates[`${basePath}/currentRound`] = g.currentRound + 1;
+            updates[`${basePath}/currentTurn`] = 1;
+            updates[`${basePath}/phase`] = 'select';
+            updates[`${basePath}/skillLog`] = [];
+            // 손패 리필
+            [uidA, uidB].forEach(uid => {
+              updates[`${basePath}/players/${uid}/hand`] = [0,1,2,3,4,5,6,7,8,9,10];
+              updates[`${basePath}/players/${uid}/selectedCard`] = null;
+              updates[`${basePath}/players/${uid}/effectiveCard`] = null;
+              updates[`${basePath}/players/${uid}/originalCard`] = null;
+            });
+          }
+        } else {
+          updates[`${basePath}/currentTurn`] = g.currentTurn + 1;
+          updates[`${basePath}/phase`] = 'select';
+          updates[`${basePath}/skillLog`] = [];
+          [uidA, uidB].forEach(uid => {
+            updates[`${basePath}/players/${uid}/selectedCard`] = null;
+            updates[`${basePath}/players/${uid}/effectiveCard`] = null;
+            updates[`${basePath}/players/${uid}/originalCard`] = null;
+          });
+        }
 
         await db.ref().update(updates);
       };
@@ -812,203 +957,285 @@
       const handleExitGame = async () => {
         if (roomId && roomData) {
           const isHost = roomData.host?.uid === user.uid;
-          if (isHost) {
-            await db.ref(`rooms/${roomId}`).remove();
-          } else {
-            await db.ref(`rooms/${roomId}/players/${user.uid}`).remove();
-          }
+          if (isHost) await db.ref(`rooms/${roomId}`).remove();
+          else await db.ref(`rooms/${roomId}/players/${user.uid}`).remove();
         }
         onExitRef.current();
       };
 
       // 로딩
       if (!roomData?.game) {
-        return (
-          <div className="min-h-screen flex items-center justify-center text-slate-400">
-            게임 준비 중...
-          </div>
-        );
+        return <div className="min-h-screen flex items-center justify-center text-amber-200">게임 준비 중...</div>;
       }
 
       const game = roomData.game;
       const isHost = roomData.host?.uid === user.uid;
-      const gamePlayers = game.players || {};
-      const myGame = gamePlayers[user.uid];
-      const oppUid = Object.keys(gamePlayers).find(uid => uid !== user.uid);
-      const oppGame = oppUid ? gamePlayers[oppUid] : null;
-
+      const myGame = game.players?.[user.uid];
+      const oppUid = Object.keys(game.players).find(uid => uid !== user.uid);
+      const oppGame = oppUid ? game.players[oppUid] : null;
       const myInfo = roomData.players?.[user.uid];
       const oppInfo = oppUid ? roomData.players?.[oppUid] : null;
 
       const phase = game.phase;
       const last = game.lastResult;
 
+      // 상태 텍스트
       let statusText = '';
+      let statusColor = 'text-amber-200';
       if (phase === 'select') {
-        if (!myGame?.selectedCard && (myGame?.hand?.length || 0) > 0) statusText = '카드를 선택하세요';
-        else statusText = '상대가 카드를 선택할 때까지 대기 중...';
+        statusText = !myGame?.selectedCard ? '🃏 카드를 선택하세요' : '⏳ 상대방 대기 중...';
       } else if (phase === 'skill') {
-        statusText = '스킬을 사용하세요 (호스트가 결과 확정)';
+        statusText = `⚡ 스킬 사용 중... (${timer}초)`;
+        statusColor = timer <= 3 ? 'text-red-400' : 'text-yellow-400';
       } else if (phase === 'result' && last) {
-        if (!last.winnerUid) statusText = '이 라운드 무승부!';
-        else if (last.winnerUid === user.uid) statusText = '이 라운드 승리!';
-        else statusText = '이 라운드 패배...';
+        if (!last.winnerUid) { statusText = '🤝 무승부!'; statusColor = 'text-yellow-400'; }
+        else if (last.winnerUid === user.uid) { statusText = '🎉 승리!'; statusColor = 'text-emerald-400'; }
+        else { statusText = '😢 패배...'; statusColor = 'text-red-400'; }
       } else if (phase === 'finished') {
         const myScore = myGame?.score || 0;
         const oppScore = oppGame?.score || 0;
-        if (myScore > oppScore) statusText = '게임 승리!';
-        else if (myScore < oppScore) statusText = '게임 패배...';
-        else statusText = '무승부로 종료!';
+        if (myScore > oppScore) { statusText = '🏆 최종 승리!'; statusColor = 'text-yellow-400'; }
+        else if (myScore < oppScore) { statusText = '💔 최종 패배...'; statusColor = 'text-red-400'; }
+        else { statusText = '🤝 무승부!'; statusColor = 'text-yellow-400'; }
       }
 
-      const mySkills = Array.isArray(myGame?.skills) ? myGame.skills : [];
+      // 표시할 카드 값 (result에서도 유지)
+      const displayMyCard = phase === 'result' || phase === 'finished'
+        ? (last?.[user.uid]?.effective ?? myGame?.effectiveCard ?? myGame?.selectedCard)
+        : (myGame?.effectiveCard ?? myGame?.selectedCard);
+      const displayOppCard = phase === 'result' || phase === 'finished'
+        ? (last?.[oppUid]?.effective ?? oppGame?.effectiveCard ?? oppGame?.selectedCard)
+        : (phase === 'skill' ? (oppGame?.effectiveCard ?? oppGame?.selectedCard) : null);
 
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 animate-fade-in">
-          <div className="w-full max-w-3xl glass rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-4">
-            {/* 상단 */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-lg font-bold border border-slate-600">
-                  {oppInfo?.name?.[0] ?? '?'}
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500">상대</div>
-                  <div className="font-bold text-white text-sm">{oppInfo?.name ?? '대기 중'}</div>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-slate-500 mb-1">ROUND</div>
-                <div className="text-lg font-bold text-yellow-300">
-                  {game.currentRound} / {game.maxRounds}
-                </div>
-              </div>
-              <div className="flex flex-col items-end text-xs text-slate-400">
-                <div>
-                  {myInfo?.name}: <span className="text-blue-400 font-bold">{myGame?.score ?? 0}</span>
-                </div>
-                <div>
-                  {oppInfo?.name ?? '상대'}: <span className="text-red-400 font-bold">{oppGame?.score ?? 0}</span>
-                </div>
-              </div>
-            </div>
+        <div className="min-h-screen flex p-2 lg:p-4 gap-2 lg:gap-4 animate-fade-in">
+          {/* 메인 게임 보드 */}
+          <div className="flex-1 flex flex-col">
+            <div className="wood-border rounded-2xl p-1 flex-1 flex flex-col">
+              <div className="poker-table rounded-xl p-4 lg:p-6 flex-1 flex flex-col relative overflow-hidden">
 
-            {/* 상태 메시지 */}
-            <div className="text-center py-2">
-              <p className="font-bold text-lg text-white mb-1">{statusText}</p>
-              {phase === 'result' && last && oppUid && (
-                <div className="text-sm text-slate-400">
-                  {myInfo?.name} [{last[user.uid]?.effective}] vs {oppInfo?.name} [{last[oppUid]?.effective}]
-                </div>
-              )}
-            </div>
+                {/* 이펙트 레이어 */}
+                {effects.map(eff => (
+                  <div key={eff.id} className="skill-effect" style={{
+                    left: eff.targetUid === user.uid ? '30%' : '70%',
+                    top: '40%',
+                    transform: 'translate(-50%, -50%)'
+                  }}>
+                    {eff.type === 'self-plus' || eff.type === 'opp-plus' ? <span className="effect-plus">+1</span> : null}
+                    {eff.type === 'self-minus' || eff.type === 'opp-minus' ? <span className="effect-minus">-1</span> : null}
+                    {eff.type === 'double' ? <span className="effect-double">×2</span> : null}
+                    {eff.type === 'random' ? <span className="effect-random">🎲</span> : null}
+                    {eff.type === 'retrieve' ? <span className="effect-retrieve">↩</span> : null}
+                    {eff.type === 'nullify' ? <span className="effect-nullify">✕</span> : null}
+                  </div>
+                ))}
 
-            {/* 카드 표시 */}
-            <div className="flex justify-center gap-8 items-center py-2">
-              <div className="flex flex-col items-center">
-                <div className="text-xs text-slate-400 mb-1">상대 카드</div>
-                <div className="w-14 h-20 rounded-lg border-2 border-slate-700 bg-slate-800 flex items-center justify-center text-xl font-bold">
-                  {(phase === 'skill' || phase === 'result' || phase === 'finished')
-                    ? (oppGame?.effectiveCard ?? oppGame?.selectedCard ?? '?')
-                    : '?'}
+                {/* 상단: 상대 정보 */}
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-red-900/50 border-2 border-red-700 flex items-center justify-center text-xl font-bold text-red-300">
+                      {oppInfo?.name?.[0] ?? '?'}
+                    </div>
+                    <div>
+                      <p className="font-bold text-red-300">{oppInfo?.name ?? '상대'}</p>
+                      <p className="text-xs text-red-300/60">점수: {oppGame?.score ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="text-center bg-black/30 px-4 py-2 rounded-lg">
+                    <p className="text-xs text-amber-200/60">ROUND {game.currentRound}/{game.maxRounds}</p>
+                    <p className="text-lg font-bold text-amber-200">TURN {game.currentTurn}/11</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="font-bold text-blue-300">{myInfo?.name}</p>
+                      <p className="text-xs text-blue-300/60">점수: {myGame?.score ?? 0}</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-blue-900/50 border-2 border-blue-700 flex items-center justify-center text-xl font-bold text-blue-300">
+                      {myInfo?.name?.[0]}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="text-xs text-slate-400 mb-1">내 카드</div>
-                <div className="w-14 h-20 rounded-lg border-2 border-blue-400 bg-slate-100 flex items-center justify-center text-xl font-bold text-slate-900">
-                  {myGame?.effectiveCard ?? myGame?.selectedCard ?? '-'}
-                </div>
-              </div>
-            </div>
 
-            {/* 내 스킬 */}
-            <div>
-              <div className="text-xs text-slate-400 mb-1">내 스킬</div>
-              {mySkills.length === 0 ? (
-                <div className="text-slate-500 text-sm">보유 스킬 없음</div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {mySkills.map((skillId, idx) => {
-                    const def = SKILL_DEFS[skillId] || { name: skillId, color: 'bg-slate-600' };
-                    return (
+                {/* 타이머 바 */}
+                {phase === 'skill' && (
+                  <div className="w-full bg-black/30 rounded-full h-2 mb-4 overflow-hidden">
+                    <div className="timer-bar" style={{ width: `${(timer / 10) * 100}%` }}></div>
+                  </div>
+                )}
+
+                {/* 상태 메시지 */}
+                <div className="text-center py-2">
+                  <p className={`text-2xl font-black ${statusColor}`}>{statusText}</p>
+                </div>
+
+                {/* 카드 영역 */}
+                <div className="flex-1 flex items-center justify-center gap-8 lg:gap-16 py-4">
+                  {/* 상대 카드 */}
+                  <div className="flex flex-col items-center">
+                    <p className="text-sm text-red-300/60 mb-2">상대 카드</p>
+                    <div className={`poker-card w-20 h-28 lg:w-24 lg:h-32 flex items-center justify-center text-4xl lg:text-5xl font-black ${
+                      displayOppCard !== null ? 'text-slate-900' : 'card-back'
+                    } ${phase === 'result' && last?.winnerUid === oppUid ? 'animate-bounce-in' : ''}`}>
+                      {displayOppCard !== null ? displayOppCard : ''}
+                    </div>
+                  </div>
+
+                  <div className="text-4xl font-black text-amber-900/30">VS</div>
+
+                  {/* 내 카드 */}
+                  <div className="flex flex-col items-center">
+                    <p className="text-sm text-blue-300/60 mb-2">내 카드</p>
+                    <div className={`poker-card w-20 h-28 lg:w-24 lg:h-32 flex items-center justify-center text-4xl lg:text-5xl font-black text-blue-900 ${
+                      phase === 'result' && last?.winnerUid === user.uid ? 'animate-bounce-in' : ''
+                    }`}>
+                      {displayMyCard !== null ? displayMyCard : '-'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 내 스킬 */}
+                <div className="mb-4">
+                  <p className="text-xs text-amber-200/60 mb-2">내 스킬 ({(myGame?.skills || []).length})</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(myGame?.skills || []).length === 0 ? (
+                      <span className="text-amber-200/40 text-sm">스킬 없음</span>
+                    ) : (myGame?.skills || []).map((skillId, idx) => {
+                      const def = SKILL_DEFS[skillId];
+                      return (
+                        <button
+                          key={idx}
+                          disabled={phase !== 'skill' || timer <= 0}
+                          onClick={() => useSkill(skillId, idx)}
+                          className={`skill-btn px-3 py-2 rounded-lg text-sm font-bold text-white ${def?.color || 'bg-gray-600'} disabled:opacity-40 disabled:cursor-not-allowed`}
+                          title={def?.desc}
+                        >
+                          {def?.icon} {def?.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 내 손패 */}
+                <div>
+                  <p className="text-xs text-amber-200/60 mb-2">내 손패 ({(myGame?.hand || []).length}장)</p>
+                  <div className="flex flex-wrap gap-1 justify-center">
+                    {(myGame?.hand || []).map(card => (
                       <button
-                        key={idx}
-                        disabled={phase !== 'skill'}
-                        onClick={() => useSkill(skillId)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold text-white ${def.color} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        key={card}
+                        disabled={phase !== 'select'}
+                        onClick={() => selectCard(card)}
+                        className={`poker-card w-12 h-16 lg:w-14 lg:h-20 flex items-center justify-center text-lg lg:text-xl font-bold text-slate-900 transition-all ${
+                          myGame?.selectedCard === card ? 'selected' : ''
+                        } ${phase !== 'select' ? 'opacity-50 cursor-not-allowed' : 'hover:transform hover:-translate-y-1 cursor-pointer'}`}
                       >
-                        {def.name}
+                        {card}
                       </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 하단 버튼 */}
+                <div className="flex justify-between items-center mt-4 pt-4 border-t border-amber-900/30">
+                  <button onClick={handleExitGame} className="text-sm text-amber-200/50 hover:text-amber-200">
+                    🚪 나가기
+                  </button>
+
+                  {phase === 'skill' && isHost && (
+                    <button onClick={resolveRound} className="px-6 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg font-bold text-white">
+                      ⚡ 결과 확정
+                    </button>
+                  )}
+
+                  {phase === 'result' && (
+                    <button
+                      onClick={setReady}
+                      disabled={myGame?.ready}
+                      className={`px-6 py-2 rounded-lg font-bold text-white transition-all ${
+                        myGame?.ready ? 'bg-gray-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'
+                      }`}
+                    >
+                      {myGame?.ready ? '✓ 준비 완료' : '➡ 다음 턴'}
+                    </button>
+                  )}
+
+                  {phase === 'finished' && (
+                    <button onClick={handleExitGame} className="px-6 py-2 bg-red-600 hover:bg-red-500 rounded-lg font-bold text-white">
+                      로비로
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 스킬 로그 사이드바 */}
+          <div className="w-64 lg:w-80 hidden md:block">
+            <div className="wood-border rounded-2xl p-1 h-full">
+              <div className="poker-table rounded-xl p-4 h-full flex flex-col">
+                <h3 className="text-amber-200 font-bold mb-3 text-center">📜 스킬 로그</h3>
+                <div className="flex-1 overflow-y-auto space-y-2">
+                  {(game.skillLog || []).length === 0 ? (
+                    <p className="text-amber-200/40 text-sm text-center">아직 사용된 스킬이 없습니다.</p>
+                  ) : (game.skillLog || []).slice().reverse().map((log, idx) => {
+                    const def = SKILL_DEFS[log.skillId];
+                    return (
+                      <div key={idx} className={`p-2 rounded-lg text-xs ${log.nullified ? 'bg-black/30 opacity-50 line-through' : 'bg-black/20'} animate-slide-up`}>
+                        {log.desc ? (
+                          <p className="text-amber-200/80">{log.desc}</p>
+                        ) : (
+                          <>
+                            <p className="text-amber-200/80">
+                              <span className={log.byUid === user.uid ? 'text-blue-400' : 'text-red-400'}>{log.byName}</span>
+                              {' → '}{def?.name}
+                            </p>
+                            {log.beforeVal !== undefined && (
+                              <p className="text-amber-200/60 mt-1">
+                                {log.beforeVal} → <span className="text-yellow-400 font-bold">{log.afterVal}</span>
+                                {log.nullified && <span className="text-red-400 ml-2">(무력화됨)</span>}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-
-            {/* 내 손패 */}
-            <div>
-              <div className="text-xs text-slate-400 mb-1">내 손패</div>
-              <div className="flex flex-wrap gap-1">
-                {(myGame?.hand ?? []).map(card => (
-                  <button
-                    key={card}
-                    disabled={phase !== 'select'}
-                    onClick={() => selectCard(card)}
-                    className={`w-12 h-16 rounded-lg border-2 text-lg font-bold flex items-center justify-center transition-transform active:scale-95
-                      ${myGame?.selectedCard === card
-                        ? 'border-yellow-400 bg-slate-100 text-slate-900'
-                        : 'border-slate-600 bg-slate-800 text-white'}
-                      ${phase !== 'select' ? 'opacity-40 cursor-not-allowed' : 'hover:border-blue-400'}`}
-                  >
-                    {card}
-                  </button>
-                ))}
-                {(!myGame?.hand || myGame.hand.length === 0) && (
-                  <div className="text-slate-500 text-sm">손패가 없습니다.</div>
-                )}
               </div>
             </div>
-
-            {/* 하단 버튼 */}
-            <div className="flex justify-between items-center pt-2">
-              <button
-                onClick={handleExitGame}
-                className="px-4 py-2 text-xs sm:text-sm text-slate-400 hover:text-white"
-              >
-                게임 종료 & 방 나가기
-              </button>
-
-              {phase === 'skill' && isHost && (
-                <button
-                  onClick={resolveRound}
-                  className="px-5 py-2 bg-yellow-500 hover:bg-yellow-400 rounded-xl text-black font-bold text-xs sm:text-sm"
-                >
-                  결과 확정
-                </button>
-              )}
-
-              {phase === 'result' && isHost && (
-                <button
-                  onClick={nextRoundOrFinish}
-                  className="px-5 py-2 bg-yellow-500 hover:bg-yellow-400 rounded-xl text-black font-bold text-xs sm:text-sm"
-                >
-                  {game.currentRound >= game.maxRounds ||
-                  (myGame?.hand?.length === 0 || oppGame?.hand?.length === 0)
-                    ? '게임 결과 확정'
-                    : '다음 라운드'}
-                </button>
-              )}
-
-              {phase === 'finished' && (
-                <button
-                  onClick={handleExitGame}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-500 rounded-xl text-white font-bold text-xs sm:text-sm"
-                >
-                  로비로 돌아가기
-                </button>
-              )}
-            </div>
           </div>
+
+          {/* 무력화 타겟 선택 모달 */}
+          {nullifyTarget && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in">
+              <div className="wood-border rounded-2xl p-1 max-w-md w-full mx-4">
+                <div className="poker-table rounded-xl p-6">
+                  <h3 className="text-xl font-bold text-amber-200 mb-4 text-center">무력화할 스킬 선택</h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {nullifyTarget.oppLogs.map((log, idx) => {
+                      const def = SKILL_DEFS[log.skillId];
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => executeNullify(log)}
+                          className="w-full p-3 bg-black/30 hover:bg-red-900/50 rounded-lg text-left transition-colors"
+                        >
+                          <p className="text-amber-200 font-bold">{def?.name}</p>
+                          <p className="text-xs text-amber-200/60">{log.beforeVal} → {log.afterVal}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setNullifyTarget(null)}
+                    className="w-full mt-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-white"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     };
