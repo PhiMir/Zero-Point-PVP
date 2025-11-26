@@ -154,17 +154,38 @@
       );
     };
 
-    // ==================== Menu ====================
+    // ==================== Menu (Enter 키 지원 추가) ====================
     const MenuScreen = ({ onStart }) => {
       const [name, setName] = useState('');
+      
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name.trim().length >= 2) {
+          onStart(name.trim());
+        }
+      };
+
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 animate-fade-in">
           <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-3">ZERO</h1>
           <p className="text-slate-400 mb-10 text-xs tracking-[0.35em] uppercase">Point PvP</p>
-          <div className="w-full max-w-xs glass p-6 rounded-2xl flex flex-col gap-4">
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="닉네임 (2~8자)" maxLength={8} className="w-full px-4 py-3 bg-slate-800 rounded-xl text-center text-white outline-none border border-slate-700 focus:border-blue-500" />
-            <button onClick={() => name.trim().length >= 2 && onStart(name.trim())} disabled={name.trim().length < 2} className="w-full py-3 bg-blue-600 rounded-xl font-bold disabled:opacity-50 active:scale-95 transition-transform">ENTER LOBBY</button>
-          </div>
+          <form onSubmit={handleSubmit} className="w-full max-w-xs glass p-6 rounded-2xl flex flex-col gap-4">
+            <input 
+              type="text" 
+              value={name} 
+              onChange={e => setName(e.target.value)} 
+              placeholder="닉네임 (2~8자)" 
+              maxLength={8} 
+              className="w-full px-4 py-3 bg-slate-800 rounded-xl text-center text-white outline-none border border-slate-700 focus:border-blue-500" 
+            />
+            <button 
+              type="submit" 
+              disabled={name.trim().length < 2} 
+              className="w-full py-3 bg-blue-600 rounded-xl font-bold disabled:opacity-50 active:scale-95 transition-transform"
+            >
+              ENTER LOBBY
+            </button>
+          </form>
         </div>
       );
     };
@@ -426,7 +447,6 @@
           let currentLog = [...(g.skillLog || [])];
           let localPlayers = JSON.parse(JSON.stringify(g.players));
 
-          // 요청 정렬 (시간순)
           requests.sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
 
           for (const [reqId, req] of requests) {
@@ -449,10 +469,10 @@
                 localPlayers[u].effectiveCard = null;
               });
               updates[`${basePath}/phase`] = 'select';
-              currentLog.push({ id: Date.now(), byUid: uid, byName: playerName, skillId, desc: `${playerName}이(가) 회수 - 턴 리셋` });
+              currentLog.push({ id: Date.now(), byUid: uid, byName: playerName, skillId: skillId, desc: `${playerName}이(가) 회수 - 턴 리셋` });
               player.skills.splice(actualIndex, 1);
               updates[`${basePath}/players/${uid}/skills`] = player.skills;
-              break; // 회수 후 다른 스킬 처리 중단
+              break;
             }
 
             // 무력화
@@ -478,24 +498,31 @@
             const beforeVal = targetPlayer.effectiveCard ?? targetPlayer.selectedCard;
             if (beforeVal === null || beforeVal === undefined) continue;
 
-            let storedRandom;
-            if (skillId === 'random') storedRandom = Math.floor(Math.random() * 11);
+            let storedRandom = null;  // ✅ undefined 대신 null 사용
+            if (skillId === 'random') {
+              storedRandom = Math.floor(Math.random() * 11);
+            }
             const afterVal = applySkillValue(beforeVal, skillId, storedRandom);
 
             updates[`${basePath}/players/${targetUid}/effectiveCard`] = afterVal;
             localPlayers[targetUid].effectiveCard = afterVal;
 
-            currentLog.push({
+            // ✅ 로그 객체 생성 시 storedRandom이 null이 아닐 때만 포함
+            const logEntry = {
               id: Date.now() + Math.random(),
               byUid: uid,
               byName: playerName,
-              skillId,
-              targetUid,
-              beforeVal,
-              afterVal,
-              storedRandom,
+              skillId: skillId,
+              targetUid: targetUid,
+              beforeVal: beforeVal,
+              afterVal: afterVal,
               nullified: false
-            });
+            };
+            // storedRandom이 있을 때만 추가
+            if (storedRandom !== null) {
+              logEntry.storedRandom = storedRandom;
+            }
+            currentLog.push(logEntry);
 
             player.skills.splice(actualIndex, 1);
             updates[`${basePath}/players/${uid}/skills`] = [...player.skills];
@@ -504,7 +531,11 @@
           updates[`${basePath}/skillLog`] = currentLog;
           updates[`${basePath}/skillRequests`] = null;
 
-          await db.ref().update(updates);
+          try {
+            await db.ref().update(updates);
+          } catch (err) {
+            console.error("Update failed:", err);
+          }
           processingRef.current = false;
         };
 
@@ -566,7 +597,6 @@
         const myGame = roomData.game.players?.[user.uid];
         if (!myGame?.skills?.[skillIndex] || myGame.skills[skillIndex] !== skillId) return;
 
-        // 무력화는 타겟 선택 필요
         if (skillId === 'nullify') {
           const oppUid = Object.keys(roomData.game.players).find(uid => uid !== user.uid);
           const oppLogs = (roomData.game.skillLog || []).filter(log => 
@@ -582,8 +612,8 @@
         const reqRef = db.ref(`rooms/${roomId}/game/skillRequests`).push();
         await reqRef.set({
           uid: user.uid,
-          skillId,
-          skillIndex,
+          skillId: skillId,
+          skillIndex: skillIndex,
           createdAt: firebase.database.ServerValue.TIMESTAMP
         });
       };
@@ -629,11 +659,9 @@
 
         if (winnerUid) updates[`${basePath}/players/${winnerUid}/score`] = (g.players[winnerUid].score || 0) + 1;
 
-        // 카드 제거
         updates[`${basePath}/players/${uidA}/hand`] = (pA.hand || []).filter(c => c !== pA.selectedCard);
         updates[`${basePath}/players/${uidB}/hand`] = (pB.hand || []).filter(c => c !== pB.selectedCard);
 
-        // 스킬 지급
         const giveSkill = (uid, count) => {
           const cur = [...(g.players[uid].skills || [])];
           for (let i = 0; i < count; i++) cur.push(randomSkillId());
@@ -650,14 +678,19 @@
           giveSkill(uidB, 1);
         }
 
-        updates[`${basePath}/lastResult`] = { [uidA]: { selected: pA.selectedCard, effective: effA }, [uidB]: { selected: pB.selectedCard, effective: effB }, winnerUid, turn: g.currentTurn };
+        updates[`${basePath}/lastResult`] = { 
+          [uidA]: { selected: pA.selectedCard, effective: effA }, 
+          [uidB]: { selected: pB.selectedCard, effective: effB }, 
+          winnerUid: winnerUid,  // null이어도 OK
+          turn: g.currentTurn 
+        };
         updates[`${basePath}/phase`] = 'result';
         updates[`${basePath}/players/${uidA}/ready`] = false;
         updates[`${basePath}/players/${uidB}/ready`] = false;
         await db.ref().update(updates);
       };
 
-      // 다음 턴 (호스트가 처리)
+      // 다음 턴
       const nextTurn = async () => {
         if (!roomData?.game || roomData.host?.uid !== user.uid) return;
         const g = roomData.game;
@@ -750,8 +783,8 @@
                   <div><p className="font-bold text-red-300 text-sm">{oppInfo?.name ?? '상대'}</p><p className="text-xs text-red-300/60">점수: {oppGame?.score ?? 0}</p></div>
                 </div>
                 <div className="text-center bg-black/30 px-4 py-2 rounded-lg">
-                  <p className="text-xs text-slate-400">R{game.currentRound}/{game.maxRounds}</p>
-                  <p className="text-lg font-bold text-white">T{game.currentTurn}/11</p>
+                  <p className="text-xs text-slate-400">R {game.currentRound}/{game.maxRounds}</p>
+                  <p className="text-lg font-bold text-white">T {game.currentTurn}/11</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-right"><p className="font-bold text-blue-300 text-sm">{myInfo?.name}</p><p className="text-xs text-blue-300/60">점수: {myGame?.score ?? 0}</p></div>
