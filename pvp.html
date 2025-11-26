@@ -20,6 +20,7 @@
       background-color: #0f172a;
       color: white;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .animate-fade-in { animation: fadeIn 0.35s ease-out; }
     @keyframes fadeIn {
@@ -59,6 +60,9 @@
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+    
+    /* 모바일 터치 최적화 */
+    button { touch-action: manipulation; }
   </style>
 </head>
 <body>
@@ -88,17 +92,25 @@
     };
 
     const SKILL_DEFS = {
-      'self-plus':  { id: 'self-plus',  name: '본인+1',  color: 'bg-green-600', desc: '내 카드 +1' },
-      'self-minus': { id: 'self-minus', name: '본인-1',  color: 'bg-green-500', desc: '내 카드 -1' },
-      'opp-plus':   { id: 'opp-plus',   name: '상대+1',  color: 'bg-red-600', desc: '상대 카드 +1' },
-      'opp-minus':  { id: 'opp-minus',  name: '상대-1',  color: 'bg-red-500', desc: '상대 카드 -1' },
-      'double':     { id: 'double',     name: '2배',     color: 'bg-yellow-600', desc: '내 카드 x2' },
-      'random':     { id: 'random',     name: '랜덤',    color: 'bg-purple-600', desc: '0~10 랜덤' },
-      'retrieve':   { id: 'retrieve',   name: '회수',    color: 'bg-blue-600', desc: '턴 리셋' },
-      'nullify':    { id: 'nullify',    name: '무력화',  color: 'bg-gray-600', desc: '스킬 취소' }
+      'self-plus':  { id: 'self-plus',  name: '본인+1',  color: 'bg-green-600', desc: '내 카드 숫자를 1 올립니다. (10→0)' },
+      'self-minus': { id: 'self-minus', name: '본인-1',  color: 'bg-green-500', desc: '내 카드 숫자를 1 내립니다. (0→10)' },
+      'opp-plus':   { id: 'opp-plus',   name: '상대+1',  color: 'bg-red-600', desc: '상대 카드 숫자를 1 올립니다.' },
+      'opp-minus':  { id: 'opp-minus',  name: '상대-1',  color: 'bg-red-500', desc: '상대 카드 숫자를 1 내립니다.' },
+      'double':     { id: 'double',     name: '2배',     color: 'bg-yellow-600', desc: '내 카드를 2배로 만듭니다. (10 초과시 일의자리)' },
+      'random':     { id: 'random',     name: '랜덤',    color: 'bg-purple-600', desc: '내 카드를 0~10 중 랜덤으로 변경합니다.' },
+      'retrieve':   { id: 'retrieve',   name: '회수',    color: 'bg-blue-600', desc: '이번 턴을 리셋합니다. 양쪽 카드가 손으로 돌아갑니다.' },
+      'nullify':    { id: 'nullify',    name: '무력화',  color: 'bg-gray-600', desc: '상대가 이번 턴에 사용한 스킬 1개를 취소합니다.' }
     };
     const SKILL_IDS = Object.keys(SKILL_DEFS);
-    const randomSkillId = () => SKILL_IDS[Math.floor(Math.random() * SKILL_IDS.length)];
+    
+    // 랜덤 스킬 생성 (제외할 스킬 목록 전달 가능)
+    const randomSkillId = (exclude = []) => {
+      const available = SKILL_IDS.filter(id => !exclude.includes(id));
+      return available[Math.floor(Math.random() * available.length)];
+    };
+    
+    // 라운드에 따른 스킬 개수
+    const getSkillCountForRound = (round) => round;
 
     const applySkillValue = (val, skillId, storedRandom) => {
       if (val === null || val === undefined) return val;
@@ -112,6 +124,65 @@
         default: return v;
       }
     };
+
+    // ==================== 룰 설명 모달 ====================
+    const RulesModal = ({ onClose }) => (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in p-4" onClick={onClose}>
+        <div className="glass rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-white">📖 게임 규칙</h3>
+            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+          </div>
+          
+          <div className="space-y-4 text-sm">
+            <section>
+              <h4 className="text-yellow-400 font-bold mb-2">기본 규칙</h4>
+              <ul className="text-slate-300 space-y-1 list-disc list-inside">
+                <li>0~10 카드를 한 장씩 냅니다</li>
+                <li><strong>작은 숫자</strong>가 승리합니다</li>
+                <li>단, <strong>10은 0을 이깁니다</strong></li>
+                <li>11장 모두 사용하면 1라운드 종료</li>
+              </ul>
+            </section>
+            
+            <section>
+              <h4 className="text-yellow-400 font-bold mb-2">스킬 획득</h4>
+              <ul className="text-slate-300 space-y-1 list-disc list-inside">
+                <li>라운드 시작: 라운드 수만큼 (1R→1개, 2R→2개...)</li>
+                <li>무승부: 양쪽 각각 1개</li>
+                <li>1점 차이 승리: 승자 1개</li>
+                <li>10 vs 0 승리: 승자 2개</li>
+              </ul>
+            </section>
+            
+            <section>
+              <h4 className="text-yellow-400 font-bold mb-2">스킬 목록</h4>
+              <div className="space-y-2">
+                {Object.values(SKILL_DEFS).map(skill => (
+                  <div key={skill.id} className="flex items-start gap-2">
+                    <span className={`${skill.color} text-white text-xs px-2 py-1 rounded font-bold shrink-0`}>{skill.name}</span>
+                    <span className="text-slate-400 text-xs">{skill.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            
+            <section>
+              <h4 className="text-yellow-400 font-bold mb-2">게임 진행</h4>
+              <ol className="text-slate-300 space-y-1 list-decimal list-inside">
+                <li>카드 선택 (양측 동시)</li>
+                <li>스킬 사용 (10초 제한)</li>
+                <li>양측 결과 확정 동의</li>
+                <li>승패 판정 & 스킬 지급</li>
+                <li>다음 턴 진행</li>
+              </ol>
+            </section>
+          </div>
+          
+          <button onClick={onClose} className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white">확인</button>
+        </div>
+      </div>
+    );
 
     // ==================== App ====================
     const App = () => {
@@ -154,19 +225,27 @@
       );
     };
 
-    // ==================== Menu (Enter 키 지원 추가) ====================
+    // ==================== Menu ====================
     const MenuScreen = ({ onStart }) => {
       const [name, setName] = useState('');
+      const [showRules, setShowRules] = useState(false);
       
       const handleSubmit = (e) => {
         e.preventDefault();
-        if (name.trim().length >= 2) {
-          onStart(name.trim());
-        }
+        if (name.trim().length >= 2) onStart(name.trim());
       };
 
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 animate-fade-in">
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 animate-fade-in relative">
+          {/* 룰 버튼 */}
+          <button 
+            onClick={() => setShowRules(true)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white font-bold text-lg"
+            title="게임 규칙"
+          >
+            ?
+          </button>
+          
           <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-3">ZERO</h1>
           <p className="text-slate-400 mb-10 text-xs tracking-[0.35em] uppercase">Point PvP</p>
           <form onSubmit={handleSubmit} className="w-full max-w-xs glass p-6 rounded-2xl flex flex-col gap-4">
@@ -186,6 +265,10 @@
               ENTER LOBBY
             </button>
           </form>
+          
+          <p className="mt-8 text-slate-600 text-xs">모바일/태블릿 지원 ✓</p>
+          
+          {showRules && <RulesModal onClose={() => setShowRules(false)} />}
         </div>
       );
     };
@@ -193,6 +276,7 @@
     // ==================== Lobby ====================
     const LobbyScreen = ({ user, playerName, onBack, onJoinRoom }) => {
       const [rooms, setRooms] = useState([]);
+      const [showRules, setShowRules] = useState(false);
 
       useEffect(() => {
         const roomsRef = db.ref('rooms');
@@ -237,7 +321,15 @@
       };
 
       return (
-        <div className="min-h-screen p-4 max-w-2xl mx-auto animate-fade-in">
+        <div className="min-h-screen p-4 max-w-2xl mx-auto animate-fade-in relative">
+          {/* 룰 버튼 */}
+          <button 
+            onClick={() => setShowRules(true)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white font-bold text-lg"
+          >
+            ?
+          </button>
+          
           <header className="flex justify-between items-center py-6">
             <button onClick={onBack} className="text-slate-400 hover:text-white">← EXIT</button>
             <h2 className="font-bold text-xl text-slate-100">LOBBY</h2>
@@ -255,6 +347,8 @@
               </div>
             ))}
           </div>
+          
+          {showRules && <RulesModal onClose={() => setShowRules(false)} />}
         </div>
       );
     };
@@ -263,6 +357,7 @@
     const WaitingRoom = ({ user, playerName, roomId, onLeave, onGameStart }) => {
       const [roomData, setRoomData] = useState(null);
       const [selectedRounds, setSelectedRounds] = useState(3);
+      const [showRules, setShowRules] = useState(false);
 
       useEffect(() => {
         const roomRef = db.ref(`rooms/${roomId}`);
@@ -308,7 +403,15 @@
       const canStart = opponent && me.ready && opponent.ready;
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 animate-fade-in">
+        <div className="min-h-screen flex items-center justify-center p-4 animate-fade-in relative">
+          {/* 룰 버튼 */}
+          <button 
+            onClick={() => setShowRules(true)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white font-bold text-lg"
+          >
+            ?
+          </button>
+          
           <div className="w-full max-w-lg glass rounded-3xl p-8 shadow-2xl">
             <h2 className="text-2xl font-bold text-white text-center mb-2">WAITING ROOM</h2>
             <p className="text-center text-slate-500 text-xs mb-6">Room #{roomId.slice(-4)} {isHost && <span className="ml-2 px-2 py-0.5 bg-yellow-900 text-yellow-200 rounded text-xs">HOST</span>}</p>
@@ -339,6 +442,8 @@
               <button onClick={handleLeave} className="w-full py-2 text-slate-500 hover:text-white text-sm">나가기</button>
             </div>
           </div>
+          
+          {showRules && <RulesModal onClose={() => setShowRules(false)} />}
         </div>
       );
     };
@@ -358,6 +463,7 @@
       const [timer, setTimer] = useState(10);
       const [effects, setEffects] = useState([]);
       const [nullifyMode, setNullifyMode] = useState(null);
+      const [showRules, setShowRules] = useState(false);
       const onExitRef = useRef(onExit);
       const timerRef = useRef(null);
       const processingRef = useRef(false);
@@ -375,7 +481,7 @@
         return () => roomRef.off('value', listener);
       }, [roomId]);
 
-      // 호스트: 게임 초기화
+      // 호스트: 게임 초기화 (라운드별 스킬 지급)
       useEffect(() => {
         if (!roomData?.host || !roomData?.players || roomData.game || isInitializing) return;
         if (roomData.host.uid !== user.uid) return;
@@ -383,16 +489,26 @@
         const initGame = async () => {
           setIsInitializing(true);
           const gamePlayers = {};
-          Object.entries(roomData.players).forEach(([uid, p]) => {
+          const playerUids = Object.keys(roomData.players);
+          const skillCount = getSkillCountForRound(1); // 1라운드 = 1개
+          
+          playerUids.forEach((uid, idx) => {
+            const skills = [];
+            for (let i = 0; i < skillCount; i++) {
+              // 각자 다른 스킬을 받도록 (다른 플레이어의 스킬을 제외하지는 않음, 단 같은 플레이어 내에서는 중복 가능)
+              skills.push(randomSkillId());
+            }
             gamePlayers[uid] = {
               score: 0,
               hand: [0,1,2,3,4,5,6,7,8,9,10],
               selectedCard: null,
               effectiveCard: null,
-              skills: [randomSkillId(), randomSkillId()],
-              ready: false
+              skills: skills,
+              ready: false,
+              confirmResult: false
             };
           });
+          
           await db.ref(`rooms/${roomId}/game`).set({
             maxRounds: roomData.settings?.maxRounds || 3,
             currentRound: 1,
@@ -421,6 +537,7 @@
         const updates = {};
         entries.forEach(([uid, p]) => {
           updates[`${basePath}/players/${uid}/effectiveCard`] = p.selectedCard;
+          updates[`${basePath}/players/${uid}/confirmResult`] = false;
         });
         updates[`${basePath}/phase`] = 'skill';
         updates[`${basePath}/skillLog`] = [];
@@ -462,9 +579,17 @@
 
             // 회수
             if (skillId === 'retrieve') {
+              // 양쪽 카드 원복
               Object.keys(localPlayers).forEach(u => {
+                const originalCard = localPlayers[u].selectedCard;
+                // 손패에 카드 돌려주기
+                if (originalCard !== null && !localPlayers[u].hand.includes(originalCard)) {
+                  localPlayers[u].hand = [...localPlayers[u].hand, originalCard].sort((a,b) => a-b);
+                  updates[`${basePath}/players/${u}/hand`] = localPlayers[u].hand;
+                }
                 updates[`${basePath}/players/${u}/selectedCard`] = null;
                 updates[`${basePath}/players/${u}/effectiveCard`] = null;
+                updates[`${basePath}/players/${u}/confirmResult`] = false;
                 localPlayers[u].selectedCard = null;
                 localPlayers[u].effectiveCard = null;
               });
@@ -498,7 +623,7 @@
             const beforeVal = targetPlayer.effectiveCard ?? targetPlayer.selectedCard;
             if (beforeVal === null || beforeVal === undefined) continue;
 
-            let storedRandom = null;  // ✅ undefined 대신 null 사용
+            let storedRandom = null;
             if (skillId === 'random') {
               storedRandom = Math.floor(Math.random() * 11);
             }
@@ -507,7 +632,6 @@
             updates[`${basePath}/players/${targetUid}/effectiveCard`] = afterVal;
             localPlayers[targetUid].effectiveCard = afterVal;
 
-            // ✅ 로그 객체 생성 시 storedRandom이 null이 아닐 때만 포함
             const logEntry = {
               id: Date.now() + Math.random(),
               byUid: uid,
@@ -518,7 +642,6 @@
               afterVal: afterVal,
               nullified: false
             };
-            // storedRandom이 있을 때만 추가
             if (storedRandom !== null) {
               logEntry.storedRandom = storedRandom;
             }
@@ -542,6 +665,20 @@
         processRequests();
       }, [roomData, roomId, user.uid]);
 
+      // 호스트: 양측 모두 confirmResult → 실제 결과 확정
+      useEffect(() => {
+        if (!roomData?.game || !roomData?.host || roomData.host.uid !== user.uid) return;
+        if (roomData.game.phase !== 'skill') return;
+        
+        const entries = Object.entries(roomData.game.players || {});
+        if (entries.length < 2) return;
+        
+        const allConfirmed = entries.every(([uid, p]) => p.confirmResult === true);
+        if (allConfirmed) {
+          resolveRound();
+        }
+      }, [roomData]);
+
       // 스킬 페이즈 타이머
       useEffect(() => {
         if (!roomData?.game || roomData.game.phase !== 'skill') {
@@ -559,10 +696,13 @@
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
       }, [roomData?.game?.phase, roomData?.game?.currentTurn]);
 
-      // 타이머 종료 시 자동 결과 확정
+      // 타이머 종료 시 자동 confirm
       useEffect(() => {
-        if (timer === 0 && roomData?.game?.phase === 'skill' && roomData?.host?.uid === user.uid) {
-          resolveRound();
+        if (timer === 0 && roomData?.game?.phase === 'skill') {
+          const myGame = roomData.game.players?.[user.uid];
+          if (myGame && !myGame.confirmResult) {
+            confirmResult();
+          }
         }
       }, [timer]);
 
@@ -596,6 +736,7 @@
         if (!roomData?.game || roomData.game.phase !== 'skill' || timer <= 0) return;
         const myGame = roomData.game.players?.[user.uid];
         if (!myGame?.skills?.[skillIndex] || myGame.skills[skillIndex] !== skillId) return;
+        if (myGame.confirmResult) return; // 이미 확정 동의한 경우 스킬 사용 불가
 
         if (skillId === 'nullify') {
           const oppUid = Object.keys(roomData.game.players).find(uid => uid !== user.uid);
@@ -633,12 +774,17 @@
         setNullifyMode(null);
       };
 
+      // 결과 확정 동의 (각자)
+      const confirmResult = async () => {
+        await db.ref(`rooms/${roomId}/game/players/${user.uid}/confirmResult`).set(true);
+      };
+
       // 다음 턴 준비
       const setReady = async () => {
         await db.ref(`rooms/${roomId}/game/players/${user.uid}/ready`).set(true);
       };
 
-      // 결과 확정 (호스트만)
+      // 실제 결과 확정 (호스트가 처리)
       const resolveRound = async () => {
         if (!roomData?.game || roomData.game.phase !== 'skill') return;
         if (roomData.host?.uid !== user.uid) return;
@@ -659,9 +805,11 @@
 
         if (winnerUid) updates[`${basePath}/players/${winnerUid}/score`] = (g.players[winnerUid].score || 0) + 1;
 
+        // 카드 제거 (손패에서)
         updates[`${basePath}/players/${uidA}/hand`] = (pA.hand || []).filter(c => c !== pA.selectedCard);
         updates[`${basePath}/players/${uidB}/hand`] = (pB.hand || []).filter(c => c !== pB.selectedCard);
 
+        // 스킬 지급
         const giveSkill = (uid, count) => {
           const cur = [...(g.players[uid].skills || [])];
           for (let i = 0; i < count; i++) cur.push(randomSkillId());
@@ -674,6 +822,7 @@
           if (isTenVsZero) giveSkill(winnerUid, 2);
           else if (diff === 1) giveSkill(winnerUid, 1);
         } else {
+          // 무승부: 각각 1개
           giveSkill(uidA, 1);
           giveSkill(uidB, 1);
         }
@@ -681,16 +830,18 @@
         updates[`${basePath}/lastResult`] = { 
           [uidA]: { selected: pA.selectedCard, effective: effA }, 
           [uidB]: { selected: pB.selectedCard, effective: effB }, 
-          winnerUid: winnerUid,  // null이어도 OK
+          winnerUid: winnerUid,
           turn: g.currentTurn 
         };
         updates[`${basePath}/phase`] = 'result';
         updates[`${basePath}/players/${uidA}/ready`] = false;
         updates[`${basePath}/players/${uidB}/ready`] = false;
+        updates[`${basePath}/players/${uidA}/confirmResult`] = false;
+        updates[`${basePath}/players/${uidB}/confirmResult`] = false;
         await db.ref().update(updates);
       };
 
-      // 다음 턴
+      // 다음 턴/라운드
       const nextTurn = async () => {
         if (!roomData?.game || roomData.host?.uid !== user.uid) return;
         const g = roomData.game;
@@ -702,22 +853,38 @@
         const updates = {};
 
         const handsEmpty = (pA.hand?.length || 0) === 0 || (pB.hand?.length || 0) === 0;
+        
         if (handsEmpty) {
+          // 라운드 종료
           if (g.currentRound >= g.maxRounds) {
             updates[`${basePath}/phase`] = 'finished';
           } else {
-            updates[`${basePath}/currentRound`] = g.currentRound + 1;
+            // 다음 라운드 시작
+            const nextRound = g.currentRound + 1;
+            const skillCount = getSkillCountForRound(nextRound);
+            
+            updates[`${basePath}/currentRound`] = nextRound;
             updates[`${basePath}/currentTurn`] = 1;
             updates[`${basePath}/phase`] = 'select';
             updates[`${basePath}/skillLog`] = [];
+            
             [uidA, uidB].forEach(uid => {
               updates[`${basePath}/players/${uid}/hand`] = [0,1,2,3,4,5,6,7,8,9,10];
               updates[`${basePath}/players/${uid}/selectedCard`] = null;
               updates[`${basePath}/players/${uid}/effectiveCard`] = null;
               updates[`${basePath}/players/${uid}/ready`] = false;
+              updates[`${basePath}/players/${uid}/confirmResult`] = false;
+              
+              // 라운드 시작 스킬 추가
+              const currentSkills = [...(g.players[uid].skills || [])];
+              for (let i = 0; i < skillCount; i++) {
+                currentSkills.push(randomSkillId());
+              }
+              updates[`${basePath}/players/${uid}/skills`] = currentSkills;
             });
           }
         } else {
+          // 다음 턴
           updates[`${basePath}/currentTurn`] = g.currentTurn + 1;
           updates[`${basePath}/phase`] = 'select';
           updates[`${basePath}/skillLog`] = [];
@@ -725,6 +892,7 @@
             updates[`${basePath}/players/${uid}/selectedCard`] = null;
             updates[`${basePath}/players/${uid}/effectiveCard`] = null;
             updates[`${basePath}/players/${uid}/ready`] = false;
+            updates[`${basePath}/players/${uid}/confirmResult`] = false;
           });
         }
         await db.ref().update(updates);
@@ -753,8 +921,20 @@
 
       let statusText = '', statusColor = 'text-white';
       if (phase === 'select') statusText = !myGame?.selectedCard ? '카드를 선택하세요' : '상대 대기 중...';
-      else if (phase === 'skill') { statusText = `스킬 사용 (${timer}초)`; statusColor = timer <= 3 ? 'text-red-400' : 'text-yellow-400'; }
-      else if (phase === 'result' && last) {
+      else if (phase === 'skill') { 
+        const myConfirm = myGame?.confirmResult;
+        const oppConfirm = oppGame?.confirmResult;
+        if (myConfirm && !oppConfirm) {
+          statusText = `상대 확정 대기 중... (${timer}초)`;
+          statusColor = 'text-blue-400';
+        } else if (!myConfirm && oppConfirm) {
+          statusText = `상대가 확정 동의함 (${timer}초)`;
+          statusColor = 'text-yellow-400';
+        } else {
+          statusText = `스킬 사용 (${timer}초)`;
+          statusColor = timer <= 3 ? 'text-red-400' : 'text-yellow-400';
+        }
+      } else if (phase === 'result' && last) {
         if (!last.winnerUid) { statusText = '무승부!'; statusColor = 'text-yellow-400'; }
         else if (last.winnerUid === user.uid) { statusText = '승리!'; statusColor = 'text-green-400'; }
         else { statusText = '패배...'; statusColor = 'text-red-400'; }
@@ -768,92 +948,119 @@
       const displayMyCard = phase === 'result' || phase === 'finished' ? (last?.[user.uid]?.effective ?? myGame?.effectiveCard ?? myGame?.selectedCard) : (myGame?.effectiveCard ?? myGame?.selectedCard);
       const displayOppCard = phase === 'skill' || phase === 'result' || phase === 'finished' ? (phase === 'result' || phase === 'finished' ? last?.[oppUid]?.effective : oppGame?.effectiveCard) ?? oppGame?.selectedCard : null;
 
+      const myConfirmed = myGame?.confirmResult;
+      const oppConfirmed = oppGame?.confirmResult;
+
       return (
-        <div className="min-h-screen flex flex-col lg:flex-row p-2 gap-2 animate-fade-in">
+        <div className="min-h-screen flex flex-col lg:flex-row p-2 gap-2 animate-fade-in relative">
+          {/* 룰 버튼 */}
+          <button 
+            onClick={() => setShowRules(true)}
+            className="absolute top-2 right-2 z-40 w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white font-bold text-sm"
+          >
+            ?
+          </button>
+          
           {/* 메인 게임 */}
           <div className="flex-1 flex flex-col">
-            <div className="glass rounded-2xl p-4 flex-1 flex flex-col relative">
+            <div className="glass rounded-2xl p-3 sm:p-4 flex-1 flex flex-col relative">
               {/* 이펙트 */}
               {effects.map(e => <div key={e.id} className="effect-text text-yellow-400" style={{ left: '50%', top: '40%', transform: 'translateX(-50%)' }}>{e.type}</div>)}
 
               {/* 상단 정보 */}
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-red-900/50 border-2 border-red-600 flex items-center justify-center font-bold text-red-300">{oppInfo?.name?.[0] ?? '?'}</div>
-                  <div><p className="font-bold text-red-300 text-sm">{oppInfo?.name ?? '상대'}</p><p className="text-xs text-red-300/60">점수: {oppGame?.score ?? 0}</p></div>
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-900/50 border-2 border-red-600 flex items-center justify-center font-bold text-red-300 text-sm sm:text-base">{oppInfo?.name?.[0] ?? '?'}</div>
+                  <div><p className="font-bold text-red-300 text-xs sm:text-sm">{oppInfo?.name ?? '상대'}</p><p className="text-[10px] sm:text-xs text-red-300/60">점수: {oppGame?.score ?? 0}</p></div>
                 </div>
-                <div className="text-center bg-black/30 px-4 py-2 rounded-lg">
-                  <p className="text-xs text-slate-400">R {game.currentRound}/{game.maxRounds}</p>
-                  <p className="text-lg font-bold text-white">T {game.currentTurn}/11</p>
+                <div className="text-center bg-black/30 px-3 py-1 sm:px-4 sm:py-2 rounded-lg">
+                  <p className="text-[10px] sm:text-xs text-slate-400">R {game.currentRound}/{game.maxRounds}</p>
+                  <p className="text-sm sm:text-lg font-bold text-white">T {game.currentTurn}/11</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-right"><p className="font-bold text-blue-300 text-sm">{myInfo?.name}</p><p className="text-xs text-blue-300/60">점수: {myGame?.score ?? 0}</p></div>
-                  <div className="w-10 h-10 rounded-full bg-blue-900/50 border-2 border-blue-600 flex items-center justify-center font-bold text-blue-300">{myInfo?.name?.[0]}</div>
+                  <div className="text-right"><p className="font-bold text-blue-300 text-xs sm:text-sm">{myInfo?.name}</p><p className="text-[10px] sm:text-xs text-blue-300/60">점수: {myGame?.score ?? 0}</p></div>
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-900/50 border-2 border-blue-600 flex items-center justify-center font-bold text-blue-300 text-sm sm:text-base">{myInfo?.name?.[0]}</div>
                 </div>
               </div>
 
               {/* 타이머 */}
-              {phase === 'skill' && <div className="w-full bg-black/30 rounded-full h-1 mb-4 overflow-hidden"><div className="timer-bar h-full" style={{ width: `${(timer/10)*100}%` }}></div></div>}
+              {phase === 'skill' && <div className="w-full bg-black/30 rounded-full h-1 mb-3 overflow-hidden"><div className="timer-bar h-full" style={{ width: `${(timer/10)*100}%` }}></div></div>}
 
               {/* 상태 */}
-              <div className="text-center py-2"><p className={`text-xl font-bold ${statusColor}`}>{statusText}</p></div>
+              <div className="text-center py-1 sm:py-2"><p className={`text-base sm:text-xl font-bold ${statusColor}`}>{statusText}</p></div>
 
               {/* 카드 영역 */}
-              <div className="flex-1 flex items-center justify-center gap-8 py-4">
+              <div className="flex-1 flex items-center justify-center gap-4 sm:gap-8 py-2 sm:py-4">
                 <div className="text-center">
-                  <p className="text-xs text-red-300/60 mb-2">상대</p>
-                  <div className={`w-16 h-24 rounded-lg border-2 flex items-center justify-center text-3xl font-bold transition-all ${displayOppCard !== null ? 'bg-white text-slate-900 border-red-400' : 'bg-red-900/50 border-red-700 text-red-700'}`}>{displayOppCard !== null ? displayOppCard : '?'}</div>
+                  <p className="text-[10px] sm:text-xs text-red-300/60 mb-1 sm:mb-2">상대</p>
+                  <div className={`w-14 h-20 sm:w-16 sm:h-24 rounded-lg border-2 flex items-center justify-center text-2xl sm:text-3xl font-bold transition-all ${displayOppCard !== null ? 'bg-white text-slate-900 border-red-400' : 'bg-red-900/50 border-red-700 text-red-700'}`}>{displayOppCard !== null ? displayOppCard : '?'}</div>
+                  {phase === 'skill' && <p className={`text-[10px] mt-1 ${oppConfirmed ? 'text-green-400' : 'text-slate-500'}`}>{oppConfirmed ? '✓ 확정' : ''}</p>}
                 </div>
-                <div className="text-3xl font-black text-slate-700">VS</div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-700">VS</div>
                 <div className="text-center">
-                  <p className="text-xs text-blue-300/60 mb-2">나</p>
-                  <div className={`w-16 h-24 rounded-lg border-2 flex items-center justify-center text-3xl font-bold transition-all ${displayMyCard !== null ? 'bg-white text-slate-900 border-blue-400' : 'bg-blue-900/50 border-blue-700 text-blue-700'}`}>{displayMyCard !== null ? displayMyCard : '-'}</div>
+                  <p className="text-[10px] sm:text-xs text-blue-300/60 mb-1 sm:mb-2">나</p>
+                  <div className={`w-14 h-20 sm:w-16 sm:h-24 rounded-lg border-2 flex items-center justify-center text-2xl sm:text-3xl font-bold transition-all ${displayMyCard !== null ? 'bg-white text-slate-900 border-blue-400' : 'bg-blue-900/50 border-blue-700 text-blue-700'}`}>{displayMyCard !== null ? displayMyCard : '-'}</div>
+                  {phase === 'skill' && <p className={`text-[10px] mt-1 ${myConfirmed ? 'text-green-400' : 'text-slate-500'}`}>{myConfirmed ? '✓ 확정' : ''}</p>}
                 </div>
               </div>
 
               {/* 스킬 */}
-              <div className="mb-4">
-                <p className="text-xs text-slate-400 mb-2">스킬 ({(myGame?.skills || []).length})</p>
-                <div className="flex flex-wrap gap-2">
-                  {(myGame?.skills || []).length === 0 ? <span className="text-slate-500 text-sm">없음</span> : (myGame?.skills || []).map((sid, idx) => {
+              <div className="mb-3">
+                <p className="text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2">스킬 ({(myGame?.skills || []).length})</p>
+                <div className="flex flex-wrap gap-1 sm:gap-2">
+                  {(myGame?.skills || []).length === 0 ? <span className="text-slate-500 text-xs sm:text-sm">없음</span> : (myGame?.skills || []).map((sid, idx) => {
                     const def = SKILL_DEFS[sid];
-                    return <button key={idx} disabled={phase !== 'skill' || timer <= 0} onClick={() => useSkill(sid, idx)} className={`px-3 py-1 rounded-lg text-sm font-bold text-white transition-all active:scale-95 ${def?.color || 'bg-gray-600'} disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110`} title={def?.desc}>{def?.name}</button>;
+                    const disabled = phase !== 'skill' || timer <= 0 || myConfirmed;
+                    return <button key={idx} disabled={disabled} onClick={() => useSkill(sid, idx)} className={`px-2 py-1 sm:px-3 sm:py-1 rounded-lg text-xs sm:text-sm font-bold text-white transition-all active:scale-95 ${def?.color || 'bg-gray-600'} disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110`} title={def?.desc}>{def?.name}</button>;
                   })}
                 </div>
               </div>
 
               {/* 손패 */}
               <div>
-                <p className="text-xs text-slate-400 mb-2">손패 ({(myGame?.hand || []).length})</p>
+                <p className="text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2">손패 ({(myGame?.hand || []).length})</p>
                 <div className="flex flex-wrap gap-1 justify-center">
                   {(myGame?.hand || []).map(c => (
-                    <button key={c} disabled={phase !== 'select'} onClick={() => selectCard(c)} className={`w-11 h-16 rounded-lg border-2 flex items-center justify-center text-lg font-bold transition-all active:scale-95 ${myGame?.selectedCard === c ? 'bg-yellow-400 text-black border-yellow-500 -translate-y-1 shadow-lg' : 'bg-white text-slate-900 border-slate-300'} ${phase !== 'select' ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-1 hover:shadow-md'}`}>{c}</button>
+                    <button key={c} disabled={phase !== 'select'} onClick={() => selectCard(c)} className={`w-9 h-14 sm:w-11 sm:h-16 rounded-lg border-2 flex items-center justify-center text-base sm:text-lg font-bold transition-all active:scale-95 ${myGame?.selectedCard === c ? 'bg-yellow-400 text-black border-yellow-500 -translate-y-1 shadow-lg' : 'bg-white text-slate-900 border-slate-300'} ${phase !== 'select' ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-1 hover:shadow-md'}`}>{c}</button>
                   ))}
                 </div>
               </div>
 
               {/* 하단 버튼 */}
-              <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-700">
-                <button onClick={handleExitGame} className="text-sm text-slate-500 hover:text-white">나가기</button>
-                {phase === 'skill' && isHost && <button onClick={resolveRound} className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg font-bold text-white active:scale-95">결과 확정</button>}
-                {phase === 'result' && <button onClick={setReady} disabled={myGame?.ready} className={`px-4 py-2 rounded-lg font-bold text-white active:scale-95 ${myGame?.ready ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'}`}>{myGame?.ready ? '✓ 대기중' : '다음 턴'}</button>}
-                {phase === 'finished' && <button onClick={handleExitGame} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg font-bold text-white active:scale-95">로비로</button>}
+              <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-700">
+                <button onClick={handleExitGame} className="text-xs sm:text-sm text-slate-500 hover:text-white">나가기</button>
+                
+                {phase === 'skill' && (
+                  <button 
+                    onClick={confirmResult} 
+                    disabled={myConfirmed}
+                    className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-bold text-white text-xs sm:text-sm active:scale-95 transition-all ${myConfirmed ? 'bg-gray-600 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-500'}`}
+                  >
+                    {myConfirmed ? '✓ 확정 완료' : '결과 확정'}
+                  </button>
+                )}
+                
+                {phase === 'result' && (
+                  <button onClick={setReady} disabled={myGame?.ready} className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-bold text-white text-xs sm:text-sm active:scale-95 ${myGame?.ready ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'}`}>{myGame?.ready ? '✓ 대기중' : '다음 턴'}</button>
+                )}
+                
+                {phase === 'finished' && <button onClick={handleExitGame} className="px-3 py-2 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-500 rounded-lg font-bold text-white text-xs sm:text-sm active:scale-95">로비로</button>}
               </div>
             </div>
           </div>
 
           {/* 스킬 로그 */}
-          <div className="w-full lg:w-72">
-            <div className="glass rounded-2xl p-4 h-full flex flex-col">
-              <h3 className="text-white font-bold mb-3 text-center">📜 스킬 로그</h3>
-              <div className="flex-1 overflow-y-auto space-y-2 max-h-64 lg:max-h-[calc(100vh-150px)]">
-                {(game.skillLog || []).length === 0 ? <p className="text-slate-500 text-sm text-center">아직 없음</p> : (game.skillLog || []).slice().reverse().map((log, idx) => {
+          <div className="w-full lg:w-64 xl:w-72">
+            <div className="glass rounded-2xl p-3 sm:p-4 h-full flex flex-col">
+              <h3 className="text-white font-bold mb-2 sm:mb-3 text-center text-sm sm:text-base">📜 스킬 로그</h3>
+              <div className="flex-1 overflow-y-auto space-y-1 sm:space-y-2 max-h-40 lg:max-h-[calc(100vh-150px)]">
+                {(game.skillLog || []).length === 0 ? <p className="text-slate-500 text-xs sm:text-sm text-center">아직 없음</p> : (game.skillLog || []).slice().reverse().map((log, idx) => {
                   const def = SKILL_DEFS[log.skillId];
                   return (
-                    <div key={idx} className={`p-2 rounded-lg text-xs animate-fade-in ${log.nullified ? 'bg-black/30 opacity-50 line-through' : 'bg-black/20'}`}>
+                    <div key={idx} className={`p-2 rounded-lg text-[10px] sm:text-xs animate-fade-in ${log.nullified ? 'bg-black/30 opacity-50 line-through' : 'bg-black/20'}`}>
                       {log.desc ? <p className="text-slate-300">{log.desc}</p> : <>
                         <p className="text-slate-300"><span className={log.byUid === user.uid ? 'text-blue-400' : 'text-red-400'}>{log.byName}</span> → {def?.name}</p>
-                        {log.beforeVal !== undefined && <p className="text-slate-400 mt-1">{log.beforeVal} → <span className="text-yellow-400 font-bold">{log.afterVal}</span>{log.nullified && <span className="text-red-400 ml-1">(무력화)</span>}</p>}
+                        {log.beforeVal !== undefined && <p className="text-slate-400 mt-0.5">{log.beforeVal} → <span className="text-yellow-400 font-bold">{log.afterVal}</span>{log.nullified && <span className="text-red-400 ml-1">(무력화)</span>}</p>}
                       </>}
                     </div>
                   );
@@ -865,12 +1072,12 @@
           {/* 무력화 모달 */}
           {nullifyMode && (
             <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in p-4">
-              <div className="glass rounded-2xl p-6 max-w-md w-full">
-                <h3 className="text-xl font-bold text-white mb-4 text-center">무력화할 스킬 선택</h3>
+              <div className="glass rounded-2xl p-4 sm:p-6 max-w-md w-full">
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 text-center">무력화할 스킬 선택</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {nullifyMode.oppLogs.map((log, idx) => (
                     <button key={idx} onClick={() => executeNullify(log)} className="w-full p-3 bg-slate-700 hover:bg-red-900/50 rounded-lg text-left transition-colors active:scale-95">
-                      <p className="text-white font-bold">{SKILL_DEFS[log.skillId]?.name}</p>
+                      <p className="text-white font-bold text-sm">{SKILL_DEFS[log.skillId]?.name}</p>
                       <p className="text-xs text-slate-400">{log.beforeVal} → {log.afterVal}</p>
                     </button>
                   ))}
@@ -879,6 +1086,8 @@
               </div>
             </div>
           )}
+          
+          {showRules && <RulesModal onClose={() => setShowRules(false)} />}
         </div>
       );
     };
